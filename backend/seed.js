@@ -18,11 +18,13 @@ async function seedIfEmpty() {
   console.log('🌱 Seeding MongoDB with default data...');
 
   // ── Users ────────────────────────────────────────────────
-  const users = await User.insertMany([
-    { username: 'admin_jameson',    full_name: 'James Admin',     password: 'admin123',    role: 'Admin',       avatar_color: '#6366f1' },
-    { username: 'tech_ali',         full_name: 'Ali Technician',  password: 'tech123',     role: 'Technician',  avatar_color: '#06b6d4' },
-    { username: 'tech_zara',        full_name: 'Zara Engineer',   password: 'tech123',     role: 'Technician',  avatar_color: '#10b981' },
-    { username: 'supervisor_bilal', full_name: 'Bilal Supervisor',password: 'super123',    role: 'Supervisor',  avatar_color: '#f59e0b' },
+  // NOTE: insertMany() bypasses Mongoose's pre('save') password-hashing hook,
+  // so each user must be created individually via .create() / .save() instead.
+  const users = await Promise.all([
+    User.create({ username: 'admin_jameson',    full_name: 'James Admin',     password: 'admin123',    role: 'Admin',       avatar_color: '#6366f1' }),
+    User.create({ username: 'tech_ali',         full_name: 'Ali Technician',  password: 'tech123',     role: 'Technician',  avatar_color: '#06b6d4' }),
+    User.create({ username: 'tech_zara',        full_name: 'Zara Engineer',   password: 'tech123',     role: 'Technician',  avatar_color: '#10b981' }),
+    User.create({ username: 'supervisor_bilal', full_name: 'Bilal Supervisor',password: 'super123',    role: 'Supervisor',  avatar_color: '#f59e0b' }),
   ]);
   const [, techAli, techZara] = users;
 
