@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MaintainIQ — Asset Info</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-deep: #03050d; --bg-card: #0d1326; --bg-input: #060814;
+      --border: rgba(99,102,241,0.15); --indigo: #6366f1; --indigo-light:#818cf8;
+      --cyan:#06b6d4; --amber:#f59e0b; --red:#ef4444; --emerald:#10b981;
+      --text-main:#e2e8f0; --text-dim:#64748b; --text-bright:#fff;
+    }
+    html, body { min-height: 100%; font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-main); }
+    body { padding: 24px 16px 60px; }
+    .wrap { max-width: 480px; margin: 0 auto; }
+    .brand { text-align: center; margin-bottom: 20px; font-weight: 800; letter-spacing: 1px; color: var(--indigo-light); }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    .asset-name { font-size: 1.3rem; font-weight: 800; color: var(--text-bright); margin-bottom: 4px; }
+    .asset-code { font-family: monospace; color: var(--indigo-light); font-size: 0.9rem; margin-bottom: 12px; }
+    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.88rem; }
+    .row:last-child { border-bottom: none; }
+    .row .label { color: var(--text-dim); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+    .badge.operational { background: rgba(16,185,129,0.15); color: var(--emerald); }
+    .badge.issue { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .badge.maintenance, .badge.inspection { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .badge.out, .badge.retired { background: rgba(239,68,68,0.15); color: var(--red); }
+    h2 { font-size: 1rem; margin-bottom: 12px; color: var(--text-bright); }
+    label { display: block; font-size: 0.82rem; color: var(--text-dim); margin: 12px 0 6px; }
+    input, select, textarea {
+      width: 100%; padding: 10px 12px; background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-main); font-family: inherit; font-size: 0.9rem;
+    }
+    textarea { resize: vertical; min-height: 70px; }
+    button {
+      width: 100%; margin-top: 16px; padding: 12px; border: none; border-radius: 8px;
+      background: var(--indigo); color: white; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    }
+    button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text-main); margin-top: 8px; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .alert { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 12px; display: none; }
+    .alert.show { display: block; }
+    .alert.error { background: rgba(239,68,68,0.12); color: #fca5a5; }
+    .alert.success { background: rgba(16,185,129,0.12); color: #6ee7b7; }
+    .ai-box { background: rgba(99,102,241,0.08); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 12px; font-size: 0.84rem; }
+    .ai-box .ai-title { font-weight: 700; color: var(--indigo-light); margin-bottom: 6px; }
+    .activity-item { font-size: 0.8rem; color: var(--text-dim); padding: 4px 0; }
+    .safety-note { font-size: 0.78rem; color: var(--amber); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">MAINTAINIQ</div>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    const API = (window.location.port === '5000' || window.location.port === '3000')
+      ? '' : 'http://localhost:5000';
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const content = document.getElementById('content');
+    let currentAsset = null;
+    let aiSuggestion = null;
+
+    function statusClass(status) {
+      if (status === 'Operational') return 'operational';
+      if (status === 'Issue Reported') return 'issue';
+      if (status === 'Under Inspection') return 'inspection';
+      if (status === 'Under Maintenance') return 'maintenance';
+      if (status === 'Out of Service') return 'out';
+      if (status === 'Retired') return 'retired';
+      return '';
+    }
+
+    async function loadAsset() {
+      if (!code) {
+        content.innerHTML = `<div class="card"><h2>No asset code provided</h2><p style="color:var(--text-dim);font-size:0.85rem;">Scan a valid MaintainIQ QR code or open a link with a code.</p></div>`;
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/public/asset/${encodeURIComponent(code)}`);
+        const data = await res.json();
+        if (!res.ok) {
+          content.innerHTML = `<div class="card"><h2>Asset not found</h2><p style="color:var(--text-dim);font-size:0.85rem;">${data.error || 'Check the code and try again.'}</p></div>`;
+          return;
+        }
+        currentAsset = data;
+        renderAsset(data);
+      } catch (e) {
+        content.innerHTML = `<div class="card"><h2>Unable to reach server</h2><p style="color:var(--text-dim);font-size:0.85rem;">Please check your connection and retry.</p></div>`;
+      }
+    }
+
+    function renderAsset(a) {
+      content.innerHTML = `
+        <div class="card">
+          <div class="asset-name">${a.name}</div>
+          <div class="asset-code">${a.asset_code}</div>
+          <span class="badge ${statusClass(a.status)}">${a.status}${a.retired ? ' (Retired)' : ''}</span>
+          <div style="margin-top:12px;">
+            <div class="row"><span class="label">Category</span><span>${a.category || '—'}</span></div>
+            <div class="row"><span class="label">Location</span><span>${a.location || '—'}</span></div>
+            <div class="row"><span class="label">Condition</span><span>${a.condition || '—'}</span></div>
+            <div class="row"><span class="label">Last Service</span><span>${a.last_service_date || '—'}</span></div>
+            <div class="row"><span class="label">Next Service</span><span>${a.next_service_date || '—'}</span></div>
+          </div>
+          ${a.recent_activity && a.recent_activity.length ? `
+            <div style="margin-top:14px;">
+              <div class="label" style="margin:0 0 6px;">Recent Activity</div>
+              ${a.recent_activity.map(x => `<div class="activity-item">• ${x.action} — ${new Date(x.date).toLocaleDateString()}</div>`).join('')}
+            </div>` : ''}
+        </div>
+        ${a.retired ? `<div class="card"><p style="color:var(--text-dim);font-size:0.85rem;">This asset has been retired and can no longer accept issue reports.</p></div>` : renderReportForm()}
+      `;
+      if (!a.retired) wireForm();
+    }
+
+    function renderReportForm() {
+      return `
+        <div class="card">
+          <h2>Report an Issue</h2>
+          <div id="alertBox" class="alert"></div>
+          <label>What's wrong? (describe in your own words)</label>
+          <textarea id="complaint" placeholder="e.g. The projector display is flickering and sometimes does not detect HDMI."></textarea>
+          <button type="button" id="btnAI" class="secondary">✨ Get AI Suggestions</button>
+          <div id="aiResult"></div>
+
+          <label>Title</label>
+          <input id="title" placeholder="Short issue title" />
+          <label>Category</label>
+          <input id="category" placeholder="e.g. Electrical, HVAC, IT" />
+          <label>Priority</label>
+          <select id="priority">
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+          <label>Your Name (optional)</label>
+          <input id="reporterName" placeholder="Reporter name" />
+          <label>Contact (optional)</label>
+          <input id="reporterContact" placeholder="Phone or email" />
+          <label>Photo or video evidence (optional)</label>
+          <input id="evidenceFile" type="file" accept="image/*,video/mp4,video/quicktime,video/webm" />
+          <div id="evidenceStatus" style="font-size:0.78rem;color:var(--text-dim);margin-top:6px;"></div>
+
+          <button type="button" id="btnSubmit">Submit Report</button>
+          <div class="safety-note">AI suggestions are advisory only. For electrical, fire, or structural hazards, stop using the asset and contact a qualified technician immediately.</div>
+        </div>
+      `;
+    }
+
+    function showAlert(msg, type) {
+      const box = document.getElementById('alertBox');
+      if (!box) return;
+      box.textContent = msg;
+      box.className = `alert show ${type}`;
+    }
+
+    function wireForm() {
+      document.getElementById('btnAI').addEventListener('click', runAI);
+      document.getElementById('btnSubmit').addEventListener('click', submitIssue);
+    }
+
+    async function runAI() {
+      const complaint = document.getElementById('complaint').value.trim();
+      if (!complaint) { showAlert('Describe the problem first.', 'error'); return; }
+      const btn = document.getElementById('btnAI');
+      btn.disabled = true; btn.textContent = 'Thinking...';
+      try {
+        const res = await fetch(`${API}/api/ai-triage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ complaint, asset: currentAsset })
+        });
+        const data = await res.json();
+        aiSuggestion = data;
+        document.getElementById('title').value = data.title || '';
+        document.getElementById('category').value = data.category || '';
+        if (data.priority) document.getElementById('priority').value = data.priority;
+
+        const causes = Array.isArray(data.possible_causes) ? data.possible_causes : [];
+        const checks = Array.isArray(data.diagnostic_checks) ? data.diagnostic_checks : [];
+        document.getElementById('aiResult').innerHTML = `
+          <div class="ai-box">
+            <div class="ai-title">AI Suggestion (review before submitting)</div>
+            ${causes.length ? `<div><b>Possible causes:</b> ${causes.join(', ')}</div>` : ''}
+            ${checks.length ? `<div style="margin-top:6px;"><b>Initial checks:</b> ${checks.join(', ')}</div>` : ''}
+            ${data.pattern_warning ? `<div style="margin-top:6px;color:var(--amber);">⚠ ${data.pattern_warning}</div>` : ''}
+            <div style="margin-top:6px;color:var(--text-dim);">Fields above have been pre-filled — edit anything before submitting.</div>
+          </div>
+        `;
+      } catch (e) {
+        showAlert('AI suggestion is unavailable right now. You can still fill the form manually.', 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = '✨ Get AI Suggestions';
+      }
+    }
+
+    async function submitIssue() {
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('complaint').value.trim();
+      const category = document.getElementById('category').value.trim();
+      const priority = document.getElementById('priority').value;
+      const reporter_name = document.getElementById('reporterName').value.trim();
+      const reporter_contact = document.getElementById('reporterContact').value.trim();
+
+      if (!title || !description) { showAlert('Please provide a title and description.', 'error'); return; }
+
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        let evidence_url = '';
+        const fileInput = document.getElementById('evidenceFile');
+        const statusEl = document.getElementById('evidenceStatus');
+        if (fileInput && fileInput.files[0]) {
+          statusEl.textContent = 'Uploading evidence...';
+          const fd = new FormData();
+          fd.append('file', fileInput.files[0]);
+          const upRes = await fetch(`${API}/api/upload/public`, { method: 'POST', body: fd });
+          const upData = await upRes.json();
+          if (upRes.ok) {
+            evidence_url = upData.url;
+            statusEl.textContent = 'Evidence attached.';
+          } else {
+            statusEl.textContent = `Evidence upload skipped: ${upData.error || 'unavailable'}`;
+          }
+        }
+
+        const res = await fetch(`${API}/api/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            asset_code: code,
+            title, description, category, priority,
+            reporter_name: reporter_name || 'Anonymous', reporter_contact,
+            evidence_url,
+            ai_used: aiSuggestion ? 1 : 0,
+            ai_suggested_title: aiSuggestion?.title || '',
+            ai_suggested_category: aiSuggestion?.category || '',
+            ai_suggested_priority: aiSuggestion?.priority || '',
+            ai_possible_causes: JSON.stringify(aiSuggestion?.possible_causes || []),
+            ai_diagnostic_checks: JSON.stringify(aiSuggestion?.diagnostic_checks || []),
+            ai_pattern_warning: aiSuggestion?.pattern_warning || null,
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not submit issue.');
+        showAlert(`Thanks! Your report ${data.issue_number} has been filed.`, 'success');
+        btn.textContent = 'Submitted ✓';
+      } catch (e) {
+        showAlert(e.message, 'error');
+        btn.disabled = false; btn.textContent = 'Submit Report';
+      }
+    }
+
+    loadAsset();
+  </script>
+</body>
+</html>

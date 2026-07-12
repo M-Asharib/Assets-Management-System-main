@@ -1,0 +1,3297 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MaintainIQ — Enterprise Administrator Portal</title>
+  <meta name="description" content="AI-Powered QR Maintenance & Asset History Platform">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (Outfit & JetBrains Mono) -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QR Code Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <!-- React & ReactDOM (Development Version with Babel for JSX) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    // ── AUTH GUARD: Redirect to login if no valid session ──────────────────
+    (function() {
+      const saved = localStorage.getItem('maintainiq_auth');
+      if (!saved) { window.location.replace('../auth.html'); return; }
+      try {
+        const { token, user } = JSON.parse(saved);
+        if (!token || !user) { window.location.replace('../auth.html'); return; }
+        // Expose globally for React App to consume
+        window.__AUTH_USER__  = user;
+        window.__AUTH_TOKEN__ = token;
+        // Pre-set role in localStorage so App uses it
+        localStorage.setItem('maintainiq_active_role', user.role);
+      } catch {
+        localStorage.removeItem('maintainiq_auth');
+        window.location.replace('../auth.html');
+      }
+    })();
+  </script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              primary: '#6366f1', // Vibrant Indigo
+              secondary: '#06b6d4', // Cyan
+              accent: '#f59e0b', // Amber
+              success: '#10b981', // Emerald
+              danger: '#ef4444', // Red
+              darkBg: '#060814', // Deep Obsidian Black
+              surface: '#0d1326', // Floating Slate Card
+              card: '#0f172a',
+              border: 'rgba(99, 102, 241, 0.15)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #060814;
+      color: #f1f5f9;
+      font-family: 'Outfit', sans-serif;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.3);
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.5);
+    }
+    /* Translucent Glassmorphism dark panels */
+    .glass-panel {
+      background: rgba(13, 19, 38, 0.65);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(99, 102, 241, 0.12);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+    .glass-card {
+      background: rgba(20, 28, 54, 0.4);
+      border: 1px solid rgba(99, 102, 241, 0.08);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card:hover {
+      border-color: rgba(99, 102, 241, 0.25);
+      box-shadow: 0 8px 30px rgba(99, 102, 241, 0.12);
+      transform: translateY(-2px);
+    }
+    
+    /* Animation Keyframes */
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.15); }
+      50% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    .hover-glow:hover {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+  </style>
+</head>
+<body class="overflow-hidden h-screen">
+  <div id="root"></div>
+
+  <!-- React JSX Application -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ==========================================
+    // INITIAL SEED DATA / LOCAL STORAGE CACHE
+    // ==========================================
+    const DEFAULT_ASSETS = [
+      { id: 1, asset_code: '#AC-8842-X', name: 'Quantum Core Server S2', category: 'Computing Hardware', location: 'London DC3', status: 'Operational', condition: 'Excellent', serial: 'SN-90210-BC', value: 154200, purchase_date: '2024-10-12', last_service_date: '2026-05-10', next_service_date: '2026-11-10', description: 'Primary high-performance computing cluster supporting main operations.' },
+      { id: 2, asset_code: '#AC-1190-V', name: 'Excavator Series-7', category: 'Heavy Machinery', location: 'Site North-Alpha', status: 'Under Maintenance', condition: 'Fair', serial: 'SN-44512-KL', value: 345000, purchase_date: '2023-09-28', last_service_date: '2026-06-15', next_service_date: '2026-12-15', description: 'Institutional mining and excavation mechanical unit.' },
+      { id: 3, asset_code: '#AC-7721-P', name: 'Power Grid Array B', category: 'Facility Infrastructure', location: 'Texas Hub', status: 'Issue Reported', condition: 'Poor', serial: 'SN-33881-ZZ', value: 42000, purchase_date: '2024-10-05', last_service_date: '2025-07-06', next_service_date: '2026-01-06', description: 'Secondary power routing substation and breaker panel array.' },
+      { id: 4, asset_code: '#AC-9005-T', name: 'Tesla Logistics Unit 04', category: 'Transportation', location: 'Berlin R&D', status: 'Operational', condition: 'Good', serial: 'SN-88229-MA', value: 89000, purchase_date: '2024-10-14', last_service_date: '2026-04-18', next_service_date: '2026-10-18', description: 'Automated electric short-haul cargo transporter.' },
+      { id: 5, asset_code: '#AC-4432-F', name: 'Industrial CNC Mill', category: 'Heavy Machinery', location: 'Detroit Plant B', status: 'Operational', condition: 'Good', serial: 'SN-55122-RR', value: 125400, purchase_date: '2024-10-01', last_service_date: '2026-03-20', next_service_date: '2026-09-20', description: 'Precision automated subtractive manufacturing spindle.' }
+    ];
+
+    const DEFAULT_ISSUES = [
+      { id: 1, issue_number: '#REQ-1001', asset_id: 3, title: 'AC Making Unusual Noise', description: 'The AC cooling vents are vibrating loudly and the main panel shows pressure warnings.', priority: 'High', category: 'Mechanical', reporter_name: 'Sarah Connor', reporter_contact: '0300-1234567', status: 'Reported', evidence_url: '', technician_id: null, created_at: '2026-07-10T14:30:00Z', updated_at: '2026-07-10T14:30:00Z', closed_at: null, ai_used: 1, ai_suggested_title: 'Substation Compressor Overpressure Warning', ai_suggested_category: 'Mechanical', ai_suggested_priority: 'High', ai_possible_causes: '["Compressor valve failure", "Coolant line blockage", "Vibration damper wear"]', ai_diagnostic_checks: '["Inspect coolant line pressure valves", "Check stabilizer brackets", "Log compressor temperature"]', ai_pattern_warning: 'Recurring issue pattern detected: This asset has failed with similar mechanical warnings twice in the last 90 days.' },
+      { id: 2, issue_number: '#REQ-1002', asset_id: 2, title: 'Hydraulic leak detected', description: 'Fluid is pooling under the main chassis during heavy hydraulic operations.', priority: 'Critical', category: 'Hydraulic', reporter_name: 'Alex Mercer', reporter_contact: 'alex.mercer@smit.edu', status: 'Inspection Started', evidence_url: '', technician_id: 2, created_at: '2026-07-11T09:15:00Z', updated_at: '2026-07-11T10:00:00Z', closed_at: null, ai_used: 1, ai_suggested_title: 'Hydraulic Hose Overpressure Fracture', ai_suggested_category: 'Mechanical', ai_suggested_priority: 'Critical', ai_possible_causes: '["High pressure hose seal wear", "Cylinder piston leak", "Hydraulic fluid expansion"]', ai_diagnostic_checks: '["Depressurize lines immediately", "Check piston seals for tear", "Verify reservoir levels"]', ai_pattern_warning: 'Safety hazard warning: High risk of sudden hydraulic pressure loss. Ensure isolation procedures are active.' }
+    ];
+
+    const DEFAULT_MAINTENANCE = [
+      { id: 1, asset_id: 2, issue_id: 2, notes: 'Seals replaced on hydraulic hose connections. Replaced worn piston gaskets.', parts_used: 'Hydraulic seal gasket set x2, high pressure connector x1', cost: 4200, start_date: '2026-06-12', end_date: '2026-06-15', technician_name: 'tech_ali', status: 'Completed' },
+      { id: 2, asset_id: 4, issue_id: null, notes: 'Routine alignment and battery health telemetry diagnostics.', parts_used: 'Lithium battery module B4', cost: 1800, start_date: '2026-04-17', end_date: '2026-04-18', technician_name: 'tech_zara', status: 'Completed' }
+    ];
+
+    const DEFAULT_LOGS = [
+      { id: 1, asset_id: 3, timestamp: '2026-07-10T14:30:00Z', actor: 'Sarah Connor', action: 'Issue Reported', details: 'Filed issue ticket #REQ-1001 via public asset page.' },
+      { id: 2, asset_id: 2, timestamp: '2026-07-11T10:00:00Z', actor: 'Admin', action: 'Status Changed', details: 'Asset advanced to Under Inspection. Issue #REQ-1002 assigned to tech_ali.' },
+      { id: 3, asset_id: 5, timestamp: '2026-07-11T11:22:00Z', actor: 'Admin', action: 'Registered', details: 'New Asset CNC Mill #AC-4432-F registered successfully.' }
+    ];
+
+    const DEFAULT_USERS = [
+      { id: 1, username: 'admin_jameson', role: 'Admin' },
+      { id: 2, username: 'tech_ali', role: 'Technician' },
+      { id: 3, username: 'tech_zara', role: 'Technician' },
+      { id: 4, username: 'supervisor_bilal', role: 'Supervisor' }
+    ];
+
+    // QR Helper
+    function makeQRDataURL(text) {
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(text);
+        qr.make();
+        return qr.createDataURL(4);
+      } catch (e) {
+        console.error(e);
+        return '';
+      }
+    }
+
+    let toastListeners = [];
+    function notify(msg, type = 'info') {
+      toastListeners.forEach(listener => listener(msg, type));
+    }
+
+    // ==========================================
+    // PAGE COMPONENTS DEFINED INDEPENDENTLY
+    // ==========================================
+
+    // 1. Dashboard Page
+    function DashboardPage({ stats, logs, assets, setActiveTab }) {
+      const urgentAlerts = logs.filter(l => l.action === 'Issue Reported').slice(0, 3);
+
+      return (
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Executive Dashboard</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Real-time status of institutional portfolio assets.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onClick={() => setActiveTab('assets')} class="px-4 py-2 bg-[#0d1326] border border-indigo-500/20 text-indigo-400 font-bold text-xs rounded-xl flex items-center gap-2 hover:bg-[#121a32] transition-all shadow-md">
+                <i data-lucide="package" class="w-4 h-4 text-indigo-400"></i> Assets Spec Sheets
+              </button>
+              <button onClick={() => setActiveTab('issues')} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i> Handle Issues
+              </button>
+            </div>
+          </div>
+
+          {/* BENTO STATS GRID */}
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 relative overflow-hidden glass-panel hover-glow cursor-pointer transition-all hover:translate-y-[-2px]">
+              <div class="flex items-center justify-between">
+                <div class="w-10 h-10 rounded-xl bg-indigo-550/10 text-indigo-400 flex items-center justify-center border border-indigo-500/10">
+                  <i data-lucide="package" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <i data-lucide="trending-up" class="w-3 h-3"></i> +12%
+                </span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-3xl font-black text-white tracking-tight font-mono">{stats.totalAssets}</h3>
+                <p class="text-xs text-indigo-400/60 font-semibold tracking-wide uppercase mt-1">Total Assets</p>
+              </div>
+            </div>
+
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 relative overflow-hidden glass-panel hover-glow cursor-pointer transition-all hover:translate-y-[-2px]">
+              <div class="flex items-center justify-between">
+                <div class="w-10 h-10 rounded-xl bg-amber-555/10 text-amber-400 flex items-center justify-center border border-amber-500/10">
+                  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[10px] font-bold text-amber-400 bg-amber-950/40 border border-amber-500/20 px-2 py-0.5 rounded-full">High priority</span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-3xl font-black text-white tracking-tight font-mono">{stats.activeIssues}</h3>
+                <p class="text-xs text-indigo-400/60 font-semibold tracking-wide uppercase mt-1">Active Issues</p>
+              </div>
+            </div>
+
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 relative overflow-hidden glass-panel hover-glow cursor-pointer transition-all hover:translate-y-[-2px]">
+              <div class="flex items-center justify-between">
+                <div class="w-10 h-10 rounded-xl bg-cyan-555/10 text-cyan-400 flex items-center justify-center border border-cyan-500/10">
+                  <i data-lucide="settings" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[10px] font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-500/20 px-2 py-0.5 rounded-full">Pending</span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-3xl font-black text-white tracking-tight font-mono">{stats.pendingMaint}</h3>
+                <p class="text-xs text-indigo-400/60 font-semibold tracking-wide uppercase mt-1">Pending Repairs</p>
+              </div>
+            </div>
+
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 relative overflow-hidden glass-panel hover-glow cursor-pointer transition-all hover:translate-y-[-2px]">
+              <div class="flex items-center justify-between">
+                <div class="w-10 h-10 rounded-xl bg-emerald-555/10 text-emerald-400 flex items-center justify-center border border-emerald-500/10">
+                  <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded-full">Healthy</span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-3xl font-black text-white tracking-tight font-mono">{stats.operationalRate}%</h3>
+                <p class="text-xs text-indigo-400/60 font-semibold tracking-wide uppercase mt-1">Uptime Rate</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CHARTS */}
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel flex flex-col shadow-xl shadow-[#03050a]/40">
+              <div class="flex justify-between items-center mb-6">
+                <div>
+                  <h4 class="text-sm font-bold text-white">System Uptime Analytics</h4>
+                  <p class="text-[11px] text-indigo-400/70">Real-time indicators across sectors</p>
+                </div>
+              </div>
+
+              <div class="flex-1 h-44 bg-[#060814]/40 rounded-xl border border-indigo-500/10 p-4 relative overflow-hidden flex items-end">
+                <svg class="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 100">
+                  <defs>
+                    <linearGradient id="chartG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.15"></stop>
+                      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"></stop>
+                    </linearGradient>
+                  </defs>
+                  <line x1="0" y1="25" x2="400" y2="25" stroke="rgba(99,102,241,0.04)" stroke-width="1" />
+                  <line x1="0" y1="50" x2="400" y2="50" stroke="rgba(99,102,241,0.04)" stroke-width="1" />
+                  <line x1="0" y1="75" x2="400" y2="75" stroke="rgba(99,102,241,0.04)" stroke-width="1" />
+                  <path d="M0 60 Q 50 30 100 80 T 200 40 T 300 70 T 400 20 L 400 100 L 0 100 Z" fill="url(#chartG)" />
+                  <path d="M0 60 Q 50 30 100 80 T 200 40 T 300 70 T 400 20" fill="none" stroke="#6366f1" stroke-width="2" />
+                  <path d="M0 80 Q 50 85 100 70 T 200 75 T 300 65 T 400 55" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" />
+                </svg>
+                <div class="w-full flex justify-between text-[9px] text-indigo-400/50 font-bold font-mono">
+                  <span>08:00 AM</span>
+                  <span>12:00 PM</span>
+                  <span>04:00 PM</span>
+                  <span>08:00 PM</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel flex flex-col shadow-xl shadow-[#03050a]/40">
+              <h4 class="text-sm font-bold text-white mb-4">Urgent Safety Alerts</h4>
+              <div class="flex-1 overflow-y-auto space-y-3">
+                {urgentAlerts.length === 0 ? (
+                  <div class="h-full flex flex-col items-center justify-center text-center text-indigo-400/50 py-6">
+                    <i data-lucide="shield-check" class="w-10 h-10 text-emerald-500/40 mb-2"></i>
+                    <p class="text-xs font-semibold">No critical failures reported.</p>
+                  </div>
+                ) : (
+                  urgentAlerts.map(l => (
+                    <div key={l.id} class="p-3 bg-red-950/40 border border-red-500/20 rounded-xl">
+                      <span class="text-[9px] font-bold uppercase bg-red-900/50 text-red-400 border border-red-800/40 px-2 py-0.5 rounded">CRITICAL</span>
+                      <p class="text-xs text-slate-200 mt-1.5 font-medium">{l.details}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Assets Page
+    function AssetsPage({ assets, setAssets, searchQuery, handleInspectAsset, activeRole, addSystemLog }) {
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [newAsset, setNewAsset] = useState({
+        name: '', category: 'Computing Hardware', location: 'London DC3',
+        condition: 'Excellent', serial: '', value: '', description: '', asset_code: ''
+      });
+
+      const handleAddAssetSubmit = (e) => {
+        e.preventDefault();
+        if(!newAsset.name) {
+          alert('Asset name is required');
+          return;
+        }
+        
+        const code = newAsset.asset_code.trim() || `#AC-${Math.floor(1000 + Math.random()*9000)}-${String.fromCharCode(65 + Math.floor(Math.random()*26))}`;
+        
+        if(assets.some(a => a.asset_code === code)) {
+          alert(`Duplicate asset ID error: ${code} code is rejected.`);
+          return;
+        }
+
+        const fresh = {
+          id: Date.now(),
+          asset_code: code,
+          name: newAsset.name,
+          category: newAsset.category,
+          location: newAsset.location,
+          status: 'Operational',
+          condition: newAsset.condition,
+          serial: newAsset.serial || 'SN-' + Math.floor(10000 + Math.random()*90000),
+          value: Number(newAsset.value) || 0,
+          purchase_date: new Date().toISOString().split('T')[0],
+          last_service_date: null,
+          next_service_date: null,
+          description: newAsset.description
+        };
+
+        setAssets(prev => [fresh, ...prev]);
+        addSystemLog(fresh.id, activeRole, 'Registered', `Asset registered with code ${code}.`);
+        setShowAddModal(false);
+        setNewAsset({ name: '', category: 'Computing Hardware', location: 'London DC3', condition: 'Excellent', serial: '', value: '', description: '', asset_code: '' });
+        notify(`Asset ${code} registered successfully!`, 'success');
+      };
+
+      const handleDeleteAsset = (id, code) => {
+        if(confirm(`Are you sure you want to delete asset ${code}? All history will be deleted.`)) {
+          setAssets(prev => prev.filter(a => a.id !== id));
+          addSystemLog(id, activeRole, 'Deleted', `Asset with code ${code} removed.`);
+          notify(`Asset ${code} deleted successfully.`, 'success');
+        }
+      };
+
+      const filtered = assets.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.asset_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.location.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      return (
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Physical Asset Registry</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Register assets, export diagnostic labels, and inspect service histories.</p>
+            </div>
+            <button onClick={() => setShowAddModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> Register New Asset
+            </button>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-indigo-500/10">
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Asset Code</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Equipment Name</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Category</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Location</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Condition</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Asset Value</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Status</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-indigo-500/10 text-xs text-slate-300">
+                  {filtered.map(a => (
+                    <tr key={a.id} class="hover:bg-indigo-500/5 transition-colors">
+                      <td class="py-4 font-mono font-bold text-indigo-400">{a.asset_code}</td>
+                      <td class="py-4">
+                        <div class="font-bold text-white">{a.name}</div>
+                        <div class="text-[10px] text-indigo-400/40 mt-0.5 font-mono">Serial: {a.serial}</div>
+                      </td>
+                      <td class="py-4 text-slate-350 font-medium">{a.category}</td>
+                      <td class="py-4 text-slate-350 font-medium">{a.location}</td>
+                      <td class="py-4">
+                        <span class={`font-bold ${
+                          a.condition === 'Excellent' || a.condition === 'Good' ? 'text-emerald-400' :
+                          a.condition === 'Fair' ? 'text-amber-400' : 'text-red-400'
+                        }`}>{a.condition}</span>
+                      </td>
+                      <td class="py-4 font-mono text-white font-bold">${a.value.toLocaleString()}</td>
+                      <td class="py-4">
+                        <span class={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          a.status === 'Operational' ? 'bg-emerald-950/40 border border-emerald-500/20 text-emerald-400' :
+                          a.status === 'Issue Reported' ? 'bg-amber-950/40 border border-amber-500/20 text-amber-400' :
+                          a.status === 'Under Maintenance' ? 'bg-indigo-950/40 border border-indigo-500/20 text-indigo-400' :
+                          'bg-red-950/40 border border-red-500/20 text-red-400'
+                        }`}>
+                          <span class={`w-1.5 h-1.5 rounded-full ${
+                            a.status === 'Operational' ? 'bg-emerald-400' :
+                            a.status === 'Issue Reported' ? 'bg-amber-400' :
+                            a.status === 'Under Maintenance' ? 'bg-indigo-400' :
+                            'bg-red-400'
+                          }`}></span>
+                          {a.status}
+                        </span>
+                      </td>
+                      <td class="py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                          <button onClick={() => handleInspectAsset(a)} class="p-1.5 rounded-lg border border-indigo-500/20 bg-[#0d1326] hover:bg-[#121a32] text-indigo-400 transition-colors shadow-sm" title="Inspect QR & details">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                          </button>
+                          <button onClick={() => handleDeleteAsset(a.id, a.asset_code)} class="p-1.5 rounded-lg border border-red-500/25 bg-[#0d1326] hover:bg-red-950/20 text-red-400 transition-colors shadow-sm" title="Delete Asset">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ADD ASSET MODAL */}
+          {showAddModal && (
+            <div class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-indigo-500/15 rounded-2xl w-full max-w-lg p-6 overflow-hidden shadow-2xl shadow-[#03050a]/60">
+                <h3 class="text-md font-bold text-white mb-4">Register New Physical Asset</h3>
+                <form onSubmit={handleAddAssetSubmit} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Asset Code / ID (Optional - auto-generated if empty)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. #AC-8842-X"
+                      value={newAsset.asset_code}
+                      onChange={e => setNewAsset({ ...newAsset, asset_code: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all font-mono"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Asset Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Projector Unit"
+                        value={newAsset.name}
+                        onChange={e => setNewAsset({ ...newAsset, name: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Category</label>
+                      <select
+                        value={newAsset.category}
+                        onChange={e => setNewAsset({ ...newAsset, category: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      >
+                        <option value="Computing Hardware">Computing Hardware</option>
+                        <option value="Heavy Machinery">Heavy Machinery</option>
+                        <option value="Facility Infrastructure">Facility Infrastructure</option>
+                        <option value="Transportation">Transportation</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Location</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Server Room B2"
+                        value={newAsset.location}
+                        onChange={e => setNewAsset({ ...newAsset, location: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Asset Value ($)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        value={newAsset.value}
+                        onChange={e => setNewAsset({ ...newAsset, value: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Condition</label>
+                      <select
+                        value={newAsset.condition}
+                        onChange={e => setNewAsset({ ...newAsset, condition: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      >
+                        <option value="Excellent">Excellent</option>
+                        <option value="Good">Good</option>
+                        <option value="Fair">Fair</option>
+                        <option value="Poor">Poor</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Serial Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. SN-8822-M"
+                        value={newAsset.serial}
+                        onChange={e => setNewAsset({ ...newAsset, serial: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Specifications Description</label>
+                    <textarea
+                      rows="3"
+                      placeholder="Detail manual instructions..."
+                      value={newAsset.description}
+                      onChange={e => setNewAsset({ ...newAsset, description: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowAddModal(false)} class="px-4 py-2 border border-indigo-500/15 rounded-xl text-xs text-indigo-400 hover:bg-[#121a32] bg-[#060814] transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white hover:bg-indigo-500 transition-colors">
+                      Register Asset
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    // 3. Asset Details Page
+    function AssetDetailsPage({ inspectedAsset, issues, maintenance, activeRole, setActiveTab }) {
+      const qrUrl = makeQRDataURL(`${window.location.origin}/public.html?code=${encodeURIComponent(inspectedAsset.asset_code)}`);
+      const assetIssues = issues.filter(i => String(i.asset_id) === String(inspectedAsset.id));
+      const assetMaint = maintenance.filter(m => String(m.asset_id) === String(inspectedAsset.id));
+
+      const handleDownloadQR = () => {
+        const a = document.createElement('a');
+        a.href = qrUrl;
+        a.download = `qr-${inspectedAsset.asset_code}.png`;
+        a.click();
+        notify('QR Code downloaded successfully.', 'success');
+      };
+
+      const handlePrintLabel = () => {
+        const win = window.open('', '_blank');
+        win.document.write(`
+          <html>
+            <body style="font-family:sans-serif; text-align:center; padding: 40px;" onload="window.print(); window.close();">
+              <div style="border: 2px solid #000; border-radius:12px; display:inline-block; padding: 20px; max-width:320px;">
+                <h3 style="margin: 0 0 10px 0;">MaintainIQ QR Asset Label</h3>
+                <img src="${qrUrl}" style="width:160px; height:160px;"/>
+                <div style="font-family:monospace; font-weight:bold; margin-top:10px;">${inspectedAsset.asset_code}</div>
+                <div style="font-size:12px; color:#555; margin-top:5px;">Scan to report issue or audit history</div>
+              </div>
+            </body>
+          </html>
+        `);
+        win.document.close();
+      };
+
+      return (
+        <div class="space-y-6">
+          <div class="flex items-center gap-3">
+            <button onClick={() => setActiveTab('assets')} class="p-2 border border-indigo-500/20 bg-[#0d1326] text-indigo-400 rounded-xl hover:bg-[#121a32] transition-colors shadow-sm">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            </button>
+            <div>
+              <div class="flex items-center gap-3">
+                <h2 class="text-2xl font-bold text-white tracking-tight">{inspectedAsset.name}</h2>
+                <span class="text-xs font-mono font-bold bg-indigo-950/50 text-indigo-400 border border-indigo-900/40 px-2 py-0.5 rounded">
+                  {inspectedAsset.asset_code}
+                </span>
+              </div>
+              <p class="text-xs text-indigo-400/70 mt-1">Audit specification sheet, linked QR code, and ticket ledger.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-6">
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4">Specifications</h4>
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Category</span>
+                    <span class="text-slate-200 font-semibold">{inspectedAsset.category}</span>
+                  </div>
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Location</span>
+                    <span class="text-slate-200 font-semibold">{inspectedAsset.location}</span>
+                  </div>
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Purchase Date</span>
+                    <span class="text-slate-200 font-semibold font-mono">{inspectedAsset.purchase_date}</span>
+                  </div>
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Asset Value ($)</span>
+                    <span class="text-slate-200 font-semibold font-mono">${inspectedAsset.value.toLocaleString()}</span>
+                  </div>
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Condition</span>
+                    <span class="text-slate-200 font-semibold">{inspectedAsset.condition}</span>
+                  </div>
+                  <div class="pb-2 border-b border-indigo-500/10">
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Serial Number</span>
+                    <span class="text-slate-200 font-semibold font-mono">{inspectedAsset.serial}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Maintenance list */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4">Maintenance Records ({assetMaint.length})</h4>
+                {assetMaint.length === 0 ? (
+                  <p class="text-xs text-indigo-400/40 py-2">No maintenance logged.</p>
+                ) : (
+                  <div class="space-y-4">
+                    {assetMaint.map(m => (
+                      <div key={m.id} class="p-3 bg-[#060814]/50 border border-indigo-500/10 rounded-xl text-xs">
+                        <div class="flex justify-between font-bold text-slate-200">
+                          <span>Serviced by: {m.technician_name}</span>
+                          <span class="font-mono text-emerald-400">${m.cost}</span>
+                        </div>
+                        <p class="text-slate-300 mt-1.5">{m.notes}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* QR side */}
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel h-fit space-y-6 shadow-xl shadow-[#03050a]/40">
+              <div class="flex flex-col items-center">
+                <div class="bg-white p-3 rounded-2xl border border-indigo-500/10 shadow-lg">
+                  <img src={qrUrl} alt="Asset QR Code" class="w-40 h-40" />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <button onClick={handleDownloadQR} class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <i data-lucide="download" class="w-4 h-4"></i> Download QR Image
+                </button>
+                <button onClick={handlePrintLabel} class="w-full py-2 bg-[#060814] hover:bg-[#121a32] text-indigo-400 font-bold text-xs rounded-xl flex items-center justify-center gap-2 border border-indigo-500/20 transition-colors">
+                  <i data-lucide="print" class="w-4 h-4"></i> Print Identification Label
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
+
+    // 4. Issues Page
+    function IssuesPage({ issues, setIssues, assets, setAssets, users, searchQuery, activeRole, addSystemLog }) {
+      const [inspectingTicket, setInspectingTicket] = useState(null);
+      const [assignedTech, setAssignedTech] = useState('');
+      const [ticketStatus, setTicketStatus] = useState('');
+      const [editTitle, setEditTitle] = useState('');
+      const [editCategory, setEditCategory] = useState('');
+      const [editPriority, setEditPriority] = useState('');
+
+      const handleSaveTriageReview = (e) => {
+        e.preventDefault();
+        setIssues(prev => prev.map(i => {
+          if(i.id === inspectingTicket.id) {
+            const updated = {
+              ...i,
+              title: editTitle,
+              category: editCategory,
+              priority: editPriority,
+              status: ticketStatus,
+              technician_id: assignedTech ? (isNaN(Number(assignedTech)) ? assignedTech : Number(assignedTech)) : null,
+              updated_at: new Date().toISOString()
+            };
+            if(updated.status === 'Reported' && updated.technician_id) {
+              updated.status = 'Assigned';
+            }
+            return updated;
+          }
+          return i;
+        }));
+
+        const linkAsset = assets.find(a => String(a.id) === String(inspectingTicket.asset_id));
+        if (linkAsset) {
+          let nextAssetStatus = linkAsset.status;
+          if(ticketStatus === 'Inspection Started') nextAssetStatus = 'Under Inspection';
+          else if(ticketStatus === 'Maintenance In Progress') nextAssetStatus = 'Under Maintenance';
+          else if(ticketStatus === 'Resolved') nextAssetStatus = 'Operational';
+          else if(ticketStatus === 'Reopened') nextAssetStatus = 'Issue Reported';
+
+          setAssets(prev => prev.map(a => {
+            if(String(a.id) === String(linkAsset.id)) {
+              return { ...a, status: nextAssetStatus };
+            }
+            return a;
+          }));
+
+          addSystemLog(linkAsset.id, activeRole, 'Issue Status Changed', `Issue ticket ${inspectingTicket.issue_number} set to ${ticketStatus}. Asset is now ${nextAssetStatus}.`);
+        }
+
+        setInspectingTicket(null);
+        notify('Triage record saved successfully!', 'success');
+      };
+
+      const openTriageReview = (ticket) => {
+        setInspectingTicket(ticket);
+        setAssignedTech(ticket.technician_id || '');
+        setTicketStatus(ticket.status);
+        setEditTitle(ticket.ai_suggested_title || ticket.title);
+        setEditCategory(ticket.ai_suggested_category || ticket.category);
+        setEditPriority(ticket.ai_suggested_priority || ticket.priority);
+      };
+
+      const filtered = issues.filter(i =>
+        i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.issue_number.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      return (
+        <div class="space-y-6">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">Maintenance Issues Desk</h2>
+            <p class="text-xs text-indigo-400/70 mt-1">Review reported problems, review AI Triages, and assign tasks to technicians.</p>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-indigo-500/10">
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Ticket ID</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Issue Reported</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Priority</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Category</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Assigned Tech</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Status</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-indigo-500/10 text-xs text-slate-350">
+                  {filtered.map(i => {
+                    const tech = users.find(u => String(u.id) === String(i.technician_id));
+                    return (
+                      <tr key={i.id} class="hover:bg-indigo-500/5 transition-colors">
+                        <td class="py-4 font-mono font-bold text-indigo-450">{i.issue_number}</td>
+                        <td class="py-4">
+                          <div class="font-bold text-white">{i.title}</div>
+                          <div class="text-[10px] text-indigo-400/40 mt-0.5">Reporter: {i.reporter_name}</div>
+                        </td>
+                        <td class="py-4">
+                          <span class={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                            i.priority === 'Critical' ? 'bg-red-950/40 border border-red-500/20 text-red-400' :
+                            i.priority === 'High' ? 'bg-amber-950/40 border border-amber-500/20 text-amber-400' :
+                            'bg-indigo-950/40 border border-indigo-500/20 text-indigo-400'
+                          }`}>{i.priority}</span>
+                        </td>
+                        <td class="py-4 text-slate-300 font-medium">{i.category}</td>
+                        <td class="py-4 text-slate-300 font-medium">
+                          {tech ? tech.username : <span class="text-slate-500 font-bold">Unassigned</span>}
+                        </td>
+                        <td class="py-4">
+                          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950/50 text-indigo-450 border border-indigo-900/40">
+                            {i.status}
+                          </span>
+                        </td>
+                        <td class="py-4 text-right">
+                          <button onClick={() => openTriageReview(i)} class="px-3 py-1.5 bg-[#0d1326] border border-indigo-500/20 text-indigo-400 font-bold hover:bg-[#121a32] rounded-lg transition-colors shadow-md">
+                            Triage & Workflow
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* EDIT WORKFLOW TICKET MODAL */}
+          {inspectingTicket && (
+            <div class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-indigo-500/15 rounded-2xl w-full max-w-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl shadow-[#03050a]/60">
+                <h3 class="text-md font-bold text-white mb-4 font-sans">Triage & Workflow Control</h3>
+                <form onSubmit={handleSaveTriageReview} class="space-y-4 overflow-y-auto pr-1">
+                  {!!inspectingTicket.ai_used && (
+                    <div class="p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-xs space-y-1.5">
+                      <div class="font-bold text-indigo-300 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI Suggestion — review before saving
+                      </div>
+                      <div class="text-slate-400">
+                        Original reporter complaint: <span class="text-slate-300">{inspectingTicket.description}</span>
+                      </div>
+                      {(() => {
+                        let causes = [], checks = [];
+                        try { causes = JSON.parse(inspectingTicket.ai_possible_causes || '[]'); } catch {}
+                        try { checks = JSON.parse(inspectingTicket.ai_diagnostic_checks || '[]'); } catch {}
+                        return (
+                          <>
+                            {causes.length > 0 && <div class="text-slate-400"><b class="text-slate-300">Possible causes:</b> {causes.join(', ')}</div>}
+                            {checks.length > 0 && <div class="text-slate-400"><b class="text-slate-300">Initial checks:</b> {checks.join(', ')}</div>}
+                          </>
+                        );
+                      })()}
+                      {inspectingTicket.ai_pattern_warning && (
+                        <div class="text-amber-400">⚠ {inspectingTicket.ai_pattern_warning}</div>
+                      )}
+                      <div class="text-slate-500">The title, category, and priority fields below are pre-filled from this suggestion — edit anything before saving; the final decision is yours.</div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Category</label>
+                      <input
+                        type="text"
+                        required
+                        value={editCategory}
+                        onChange={e => setEditCategory(e.target.value)}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Priority</label>
+                      <select
+                        value={editPriority}
+                        onChange={e => setEditPriority(e.target.value)}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      >
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Assign Technician</label>
+                    <select
+                      value={assignedTech}
+                      onChange={e => setAssignedTech(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    >
+                      <option value="">Choose tech...</option>
+                      {users.filter(u => u.role === 'Technician').map(t => (
+                        <option key={t.id} value={t.id}>{t.username}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Workflow Status</label>
+                    <select
+                      value={ticketStatus}
+                      onChange={e => setTicketStatus(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    >
+                      <option value="Reported">Reported</option>
+                      <option value="Assigned">Assigned</option>
+                      <option value="Inspection Started">Inspection Started</option>
+                      <option value="Maintenance In Progress">Maintenance In Progress</option>
+                      <option value="Waiting For Parts">Waiting For Parts</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setInspectingTicket(null)} class="px-4 py-2 border border-indigo-500/15 rounded-xl text-xs text-indigo-400 hover:bg-[#121a32] bg-[#060814] transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white hover:bg-indigo-500 transition-colors">
+                      Save Workflow Change
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 5. Maintenance Page
+    function MaintenancePage({ maintenance, setMaintenance, assets, setAssets, users, searchQuery, activeRole, addSystemLog }) {
+      const [showAddLogModal, setShowAddLogModal] = useState(false);
+      const [newLog, setNewLog] = useState({
+        asset_id: '', notes: '', parts_used: '', cost: '', technician_name: 'tech_ali'
+      });
+
+      const handleAddLogSubmit = (e) => {
+        e.preventDefault();
+        if(!newLog.asset_id || !newLog.notes) {
+          alert('Asset ID and service notes are required');
+          return;
+        }
+
+        const targetAsset = assets.find(a => String(a.id) === String(newLog.asset_id));
+        if(!targetAsset) return;
+
+        const fresh = {
+          id: Date.now(),
+          asset_id: targetAsset.id,
+          issue_id: null,
+          notes: newLog.notes,
+          parts_used: newLog.parts_used,
+          cost: Number(newLog.cost) || 0,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date().toISOString().split('T')[0],
+          technician_name: newLog.technician_name,
+          status: 'Completed'
+        };
+
+        setMaintenance(prev => [fresh, ...prev]);
+
+        setAssets(prev => prev.map(a => {
+          if(a.id === targetAsset.id) {
+            const nextDate = new Date();
+            nextDate.setDate(nextDate.getDate() + 180);
+            return {
+              ...a,
+              last_service_date: fresh.end_date,
+              next_service_date: nextDate.toISOString().split('T')[0],
+              status: 'Operational'
+            };
+          }
+          return a;
+        }));
+
+        addSystemLog(targetAsset.id, activeRole, 'Maintenance Logged', `Maintenance logged by ${newLog.technician_name}. Cost: $${fresh.cost}.`);
+        setShowAddLogModal(false);
+        setNewLog({ asset_id: '', notes: '', parts_used: '', cost: '', technician_name: 'tech_ali' });
+        notify('Maintenance record saved successfully!', 'success');
+      };
+
+      const filtered = maintenance.filter(m =>
+        m.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.technician_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      return (
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Servicing Logs</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Audit complete ledgers of costs and repairs.</p>
+            </div>
+            <button onClick={() => setShowAddLogModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> Create Service Record
+            </button>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-indigo-500/10">
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Asset Code</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Notes / Actions</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Technician</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Completed Date</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Parts Used</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Labor Cost</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-indigo-500/10 text-xs text-slate-300">
+                  {filtered.map(m => {
+                    const linkedAssetObj = assets.find(a => String(a.id) === String(m.asset_id));
+                    return (
+                      <tr key={m.id} class="hover:bg-indigo-500/5 transition-colors">
+                        <td class="py-4">
+                          {linkedAssetObj ? (
+                            <span class="font-mono font-bold text-indigo-400">
+                              {linkedAssetObj.asset_code}
+                            </span>
+                          ) : (
+                            <span class="text-indigo-400/40 font-mono font-bold">N/A</span>
+                          )}
+                        </td>
+                        <td class="py-4 text-white font-semibold max-w-xs">{m.notes}</td>
+                        <td class="py-4 text-slate-350 font-medium">{m.technician_name}</td>
+                        <td class="py-4 text-indigo-450 font-mono">{m.end_date}</td>
+                        <td class="py-4 text-slate-350">{m.parts_used || 'None'}</td>
+                        <td class="py-4 font-mono text-emerald-400 font-bold">${m.cost.toLocaleString()}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* LOG MODAL */}
+          {showAddLogModal && (
+            <div class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-indigo-500/15 rounded-2xl w-full max-w-lg p-6 overflow-hidden shadow-2xl shadow-[#03050a]/60">
+                <h3 class="text-md font-bold text-white mb-4">Log Completed Service</h3>
+                <form onSubmit={handleAddLogSubmit} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Target Asset *</label>
+                    <select
+                      required
+                      value={newLog.asset_id}
+                      onChange={e => setNewLog({ ...newLog, asset_id: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    >
+                      <option value="">Choose asset...</option>
+                      {assets.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.asset_code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Service Cost ($)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 1500"
+                        value={newLog.cost}
+                        onChange={e => setNewLog({ ...newLog, cost: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Technician</label>
+                      <select
+                        value={newLog.technician_name}
+                        onChange={e => setNewLog({ ...newLog, technician_name: e.target.value })}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      >
+                        {users.filter(u => u.role === 'Technician').map(tech => (
+                          <option key={tech.id} value={tech.username}>{tech.username}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Service Notes *</label>
+                    <textarea
+                      rows="3"
+                      required
+                      value={newLog.notes}
+                      onChange={e => setNewLog({ ...newLog, notes: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowAddLogModal(false)} class="px-4 py-2 border border-indigo-500/15 rounded-xl text-xs text-indigo-400 hover:bg-[#121a32] bg-[#060814] transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white hover:bg-indigo-500 transition-colors">
+                      Save Record
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 6. QR Batch Page
+    function QrCodesPage({ assets }) {
+      const [selectedBatch, setSelectedBatch] = useState([]);
+
+      const handleToggleSelect = (id) => {
+        if (selectedBatch.includes(id)) {
+          setSelectedBatch(prev => prev.filter(x => x !== id));
+        } else {
+          setSelectedBatch(prev => [...prev, id]);
+        }
+      };
+
+      const handleSelectAll = () => {
+        if (selectedBatch.length === assets.length) {
+          setSelectedBatch([]);
+        } else {
+          setSelectedBatch(assets.map(a => a.id));
+        }
+      };
+
+      const handlePrintBatchSheet = () => {
+        if (selectedBatch.length === 0) return;
+        const win = window.open('', '_blank');
+        let labelHTML = `
+          <html>
+            <body style="font-family:sans-serif; padding: 20px;" onload="window.print(); window.close();">
+              <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap: 20px;">
+        `;
+        assets.filter(a => selectedBatch.includes(a.id)).forEach(a => {
+          const qr = makeQRDataURL(`${window.location.origin}/public.html?code=${encodeURIComponent(a.asset_code)}`);
+          labelHTML += `
+            <div style="border: 2px solid #000; border-radius: 8px; padding: 15px; text-align: center;">
+              <h4 style="margin:0 0 5px 0;">${a.name}</h4>
+              <img src="${qr}" style="width:110px; height:110px;"/>
+              <div style="font-family:monospace; font-size:11px; margin-top:5px; font-weight:bold;">${a.asset_code}</div>
+            </div>
+          `;
+        });
+        labelHTML += `</div></body></html>`;
+        win.document.write(labelHTML);
+        win.document.close();
+      };
+
+      return (
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Bulk QR Code Generator</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Select assets to generate printable batch label sheets.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onClick={handleSelectAll} class="px-4 py-2 bg-[#0d1326] border border-indigo-500/20 text-indigo-400 font-bold text-xs rounded-xl hover:bg-[#121a32] transition-colors shadow-sm">
+                {selectedBatch.length === assets.length ? 'Deselect All' : 'Select All'}
+              </button>
+              <button onClick={handlePrintBatchSheet} disabled={selectedBatch.length === 0} class="px-4 py-2 bg-indigo-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+                <i data-lucide="print" class="w-4 h-4"></i> Print Selected ({selectedBatch.length})
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {assets.map(a => {
+                const isChecked = selectedBatch.includes(a.id);
+                const qr = makeQRDataURL(`${window.location.origin}/public.html?code=${encodeURIComponent(a.asset_code)}`);
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => handleToggleSelect(a.id)}
+                    class={`p-4 rounded-2xl border cursor-pointer flex flex-col items-center gap-3 transition-all relative ${
+                      isChecked ? 'bg-indigo-950/50 border-indigo-500 shadow-md' : 'bg-[#060814]/40 border border-indigo-500/10 hover:border-indigo-500/30'
+                    }`}
+                  >
+                    <div class="bg-white p-2 rounded-xl mt-3 border border-indigo-500/10 shadow-sm">
+                      <img src={qr} alt="QR preview" class="w-24 h-24" />
+                    </div>
+                    <div class="text-center">
+                      <h4 class="text-xs font-bold text-white truncate max-w-[140px]">{a.name}</h4>
+                      <span class="text-[10px] font-mono text-indigo-400/40 font-bold block mt-1">{a.asset_code}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 7. Analytics Page
+    function AnalyticsPage() {
+      return (
+        <div class="space-y-6">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">Maintenance Performance Analytics</h2>
+            <p class="text-xs text-indigo-400/70 mt-1">Mean Time to Repair (MTTR), budget expenditures, and root cause distributions.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Mean Time to Repair (MTTR)</span>
+              <h3 class="text-2xl font-black text-white mt-1">2.4 Hours</h3>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Maintenance Spend YTD</span>
+              <h3 class="text-2xl font-black text-white mt-1">$188,400</h3>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Asset Reliability Ratio</span>
+              <h3 class="text-2xl font-black text-white mt-1">96.8%</h3>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Preventive vs Reactive Ratio</span>
+              <h3 class="text-2xl font-black text-white mt-1">74% / 26%</h3>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <h4 class="text-sm font-bold text-white mb-4">Critical Root Cause Breakdown</h4>
+              <div class="space-y-4">
+                <div>
+                  <div class="flex justify-between text-xs text-indigo-400/60 mb-1">
+                    <span>Mechanical Wear / Friction</span>
+                    <span class="font-bold text-white font-mono">34%</span>
+                  </div>
+                  <div class="w-full h-2 bg-[#060814] rounded-full overflow-hidden">
+                    <div class="h-full bg-indigo-500" style={{ width: '34%' }}></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-xs text-indigo-400/60 mb-1">
+                    <span>Electrical Overload / Voltage drop</span>
+                    <span class="font-bold text-white font-mono">28%</span>
+                  </div>
+                  <div class="w-full h-2 bg-[#060814] rounded-full overflow-hidden">
+                    <div class="h-full bg-cyan-500" style={{ width: '28%' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+              <h4 class="text-sm font-bold text-white mb-4">System Bulletin</h4>
+              <p class="text-xs text-slate-300 leading-relaxed font-medium">
+                Compressor systems reported higher heat indices in recent audits. Recommended preventive filter replacements scheduled ahead.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }    // 8. History Page
+    function HistoryPage({ logs, searchQuery }) {
+      const filtered = logs.filter(l =>
+        l.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.actor.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      return (
+        <div class="space-y-6">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">Security Audit Logs Ledger</h2>
+            <p class="text-xs text-indigo-400/70 mt-1">Immutable ledger details of all registered items and workflow actions.</p>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-6 shadow-xl shadow-[#03050a]/40">
+            <div class="relative pl-6 border-l border-indigo-500/20 space-y-6">
+              {filtered.map(l => (
+                <div key={l.id} class="relative">
+                  <div class="absolute -left-[30px] top-1 w-4.5 h-4.5 rounded-full bg-[#060814] border-2 border-indigo-500 flex items-center justify-center shadow-sm">
+                    <div class="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-3">
+                      <span class="text-xs font-bold text-white">{l.action}</span>
+                      <span class="text-[10px] text-indigo-400/40 font-semibold font-mono">
+                        {new Date(l.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-300 mt-1 font-medium">{l.details}</p>
+                    <div class="text-[10px] text-indigo-400/50 font-semibold mt-2">
+                      Actor Account: <strong class="text-indigo-300">{l.actor}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 9. Users Page
+    function UsersPage({ users, setUsers, activeRole, searchQuery }) {
+      const [showAddUser, setShowAddUser] = useState(false);
+      const [newUser, setNewUser] = useState({ username: '', role: 'Technician' });
+
+      const handleAddUserSubmit = (e) => {
+        e.preventDefault();
+        if(!newUser.username) return;
+        
+        const fresh = {
+          id: Date.now(),
+          username: newUser.username.trim(),
+          role: newUser.role
+        };
+
+        setUsers(prev => [...prev, fresh]);
+        setShowAddUser(false);
+        setNewUser({ username: '', role: 'Technician' });
+        notify(`User ${fresh.username} added successfully!`, 'success');
+      };
+
+      const filtered = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return (
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Team Credentials Registry</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Manage logins, roles, and administrative authorization tiers.</p>
+            </div>
+            <button onClick={() => setShowAddUser(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Add Team Member
+            </button>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-indigo-500/10">
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Username</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Authorization Role</th>
+                    <th class="pb-3 text-[10px] font-bold text-indigo-400/50 uppercase tracking-widest">Permission Level</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-indigo-500/10 text-xs text-slate-300">
+                  {filtered.map(u => (
+                    <tr key={u.id} class="hover:bg-indigo-500/5">
+                      <td class="py-4 font-bold text-white">{u.username}</td>
+                      <td class="py-4">
+                        <span class="font-bold text-[10px] uppercase text-indigo-450 bg-indigo-950/50 border border-indigo-900/40 px-2 py-0.5 rounded">{u.role}</span>
+                      </td>
+                      <td class="py-4 text-slate-400">
+                        {u.role === 'Admin' ? 'Full Access Control' : 'Assigned tasks execution'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {showAddUser && (
+            <div class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-indigo-500/15 rounded-2xl w-full max-w-sm p-6 overflow-hidden shadow-2xl shadow-[#03050a]/60">
+                <h3 class="text-md font-bold text-white mb-4">Add Team Member Login</h3>
+                <form onSubmit={handleAddUserSubmit} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Username *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. tech_kabeer"
+                      value={newUser.username}
+                      onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Role</label>
+                    <select
+                      value={newUser.role}
+                      onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    >
+                      <option value="Admin">Admin</option>
+                      <option value="Technician">Technician</option>
+                      <option value="Supervisor">Supervisor</option>
+                    </select>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowAddUser(false)} class="px-4 py-2 border border-indigo-500/15 rounded-xl text-xs text-indigo-400 hover:bg-[#121a32] bg-[#060814] transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white hover:bg-indigo-500 transition-colors">
+                      Create Access
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 10. Settings Page
+    function SettingsPage() {
+      return (
+        <div class="space-y-6">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">System Configuration</h2>
+            <p class="text-xs text-indigo-400/70 mt-1">Configure global parameters and timezones.</p>
+          </div>
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-sm">
+            <p class="text-xs text-slate-300 font-medium">MaintainIQ platform configurations are synchronized across all nodes.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // 11. Public Preview / Scanner Page
+    function PublicScannerPage({ assets, setAssets, issues, setIssues, addSystemLog }) {
+      const [scannedCode, setScannedCode] = useState('');
+      const [complaintText, setComplaintText] = useState('');
+      const [reporter, setReporter] = useState('');
+      const [reporterContact, setReporterContact] = useState('');
+
+      const handleMockScan = (e) => {
+        e.preventDefault();
+        if(!scannedCode) return;
+        const found = assets.find(a => a.asset_code === scannedCode);
+        if(!found) {
+          alert('Scanned asset code not found.');
+        } else {
+          notify(`QR scan successful: Asset ${scannedCode} loaded!`, 'success');
+        }
+      };
+
+      const handlePublicReportSubmit = (e) => {
+        e.preventDefault();
+        const target = assets.find(a => a.asset_code === scannedCode);
+        if(!target) {
+          alert('Please scan/load a valid asset code first!');
+          return;
+        }
+
+        const textLower = complaintText.toLowerCase();
+        let aiTitle = 'Equipment Operational Warning';
+        let aiCategory = 'Mechanical';
+        let aiPriority = 'Medium';
+        let aiCauses = ['Gasket wear', 'Stabilizer loose'];
+        let aiChecks = ['Inspect physical alignment', 'Tighten stabilizer bolts'];
+
+        if(textLower.includes('leak') || textLower.includes('fluid') || textLower.includes('water')) {
+          aiTitle = 'Fluid Leak Warning';
+          aiCategory = 'Hydraulic';
+          aiPriority = 'High';
+          aiCauses = ['Hose connection seal fracture', 'Reservoir overfill'];
+          aiChecks = ['Check line compression seals', 'Clean fluid residue'];
+        } else if(textLower.includes('noise') || textLower.includes('vibrate')) {
+          aiTitle = 'Vibration Warning';
+          aiCategory = 'Mechanical';
+          aiPriority = 'High';
+          aiCauses = ['Bearing fracture', 'Rotary spindle alignment deviation'];
+          aiChecks = ['Verify rotary bearing alignment'];
+        }
+
+        const ticketNum = `#REQ-${Math.floor(1000 + Math.random()*9000)}`;
+
+        const newIssue = {
+          id: Date.now(),
+          issue_number: ticketNum,
+          asset_id: target.id,
+          title: complaintText.substring(0, 32) + '...',
+          description: complaintText,
+          priority: aiPriority,
+          category: aiCategory,
+          reporter_name: reporter || 'Public Scanner User',
+          reporter_contact: reporterContact || 'N/A',
+          status: 'Reported',
+          evidence_url: '',
+          technician_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          closed_at: null,
+          ai_used: 1,
+          ai_suggested_title: aiTitle,
+          ai_suggested_category: aiCategory,
+          ai_suggested_priority: aiPriority,
+          ai_possible_causes: JSON.stringify(aiCauses),
+          ai_diagnostic_checks: JSON.stringify(aiChecks),
+          ai_pattern_warning: 'Recurring checks required.'
+        };
+
+        setIssues(prev => [newIssue, ...prev]);
+
+        setAssets(prev => prev.map(a => {
+          if(String(a.id) === String(target.id)) {
+            return { ...a, status: 'Issue Reported' };
+          }
+          return a;
+        }));
+
+        addSystemLog(target.id, reporter || 'Public User', 'Issue Reported', `Filed issue ticket ${ticketNum} via public QR scanner page.`);
+        notify(`Issue ticket ${ticketNum} filed successfully!`, 'success');
+        
+        setComplaintText('');
+        setReporter('');
+        setReporterContact('');
+      };
+
+      const activeScannedAsset = assets.find(a => a.asset_code === scannedCode);
+
+      return (
+        <div class="space-y-6 max-w-xl mx-auto">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">Public QR Scanner Hub</h2>
+            <p class="text-xs text-indigo-400/70 mt-1">Simulate scanning a physical QR code on an asset using a mobile phone.</p>
+          </div>
+
+          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-4 shadow-xl shadow-[#03050a]/40">
+            <h4 class="text-sm font-bold text-white">Scan Device Code</h4>
+            <form onSubmit={handleMockScan} class="flex gap-2">
+              <select
+                value={scannedCode}
+                onChange={e => setScannedCode(e.target.value)}
+                class="flex-1 bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all font-mono"
+              >
+                <option value="">Scan QR Code...</option>
+                {assets.map(a => (
+                  <option key={a.id} value={a.asset_code}>{a.asset_code} — {a.name}</option>
+                ))}
+              </select>
+              <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/10">
+                Scan QR
+              </button>
+            </form>
+          </div>
+
+          {activeScannedAsset && (
+            <div class="space-y-6">
+              <div class="bg-[#0c1020]/80 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-4 shadow-md">
+                <div class="flex justify-between items-center">
+                  <h3 class="font-bold text-white text-md">{activeScannedAsset.name}</h3>
+                  <span class="text-xs font-mono font-bold bg-indigo-950/50 text-indigo-400 border border-indigo-900/40 px-2 py-0.5 rounded">
+                    {activeScannedAsset.asset_code}
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Category</span>
+                    <span class="text-white font-semibold">{activeScannedAsset.category}</span>
+                  </div>
+                  <div>
+                    <span class="block text-indigo-400/50 text-[10px] uppercase font-bold">Location</span>
+                    <span class="text-white font-semibold">{activeScannedAsset.location}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-4 shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white">Report Fault or Damage</h4>
+                <form onSubmit={handlePublicReportSubmit} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Your Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Sarah Connor"
+                      value={reporter}
+                      onChange={e => setReporter(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Complaint / Failure Description *</label>
+                    <textarea
+                      rows="3"
+                      required
+                      placeholder="Detail the issue: e.g. 'The generator is leaking fluid...'"
+                      value={complaintText}
+                      onChange={e => setComplaintText(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+                  <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/10">
+                    Submit Incident Report
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 13. Supervisor Command Center Page
+    function SupervisorPage({ issues, setIssues, maintenance, assets, users, logs, addSystemLog }) {
+      const [assignModal, setAssignModal] = useState(null);  // holds issue to assign
+      const [assignTo, setAssignTo] = useState('');
+      const [approveModal, setApproveModal] = useState(null); // holds maintenance to approve
+
+      const techUsers = users.filter(u => u.role === 'Technician');
+      const unassigned = issues.filter(i => !i.technician_id && !['Resolved','Closed'].includes(i.status));
+      const activeJobs = issues.filter(i => i.technician_id && !['Resolved','Closed'].includes(i.status));
+      const resolved = issues.filter(i => ['Resolved','Closed'].includes(i.status));
+      const pendingCost = maintenance.filter(m => m.status === 'In Progress');
+      const totalSpend = maintenance.reduce((s, m) => s + (m.cost || 0), 0);
+
+      const criticalCount = issues.filter(i => i.priority === 'Critical' && !['Resolved','Closed'].includes(i.status)).length;
+
+      const techWorkload = techUsers.map(t => ({
+        ...t,
+        open: issues.filter(i => String(i.technician_id) === String(t.id) && !['Resolved','Closed'].includes(i.status)).length,
+        done: issues.filter(i => String(i.technician_id) === String(t.id) && ['Resolved','Closed'].includes(i.status)).length,
+        cost: maintenance.filter(m => m.technician_name === t.username).reduce((s,m) => s+(m.cost||0),0)
+      }));
+
+      const assetHealth = [
+        { label: 'Operational', count: assets.filter(a => a.status === 'Operational').length, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+        { label: 'Under Maintenance', count: assets.filter(a => a.status === 'Under Maintenance').length, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+        { label: 'Issue Reported', count: assets.filter(a => a.status === 'Issue Reported').length, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+        { label: 'Decommissioned', count: assets.filter(a => a.status === 'Decommissioned').length, color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20' },
+      ];
+
+      const handleAssign = (e) => {
+        e.preventDefault();
+        if (!assignModal || !assignTo) return;
+        const tech = users.find(u => u.username === assignTo);
+        setIssues(prev => prev.map(i =>
+          String(i.id) === String(assignModal.id) ? { ...i, technician_id: tech.id, status: 'Assigned', updated_at: new Date().toISOString() } : i
+        ));
+        addSystemLog(assignModal.asset_id, 'Supervisor', 'Issue Assigned', `Issue ${assignModal.issue_number} assigned to ${assignTo} by Supervisor.`);
+        notify(`${assignModal.issue_number} assigned to ${assignTo}`, 'success');
+        setAssignModal(null);
+        setAssignTo('');
+      };
+
+      const priorityBadge = (p) => {
+        if (p === 'Critical') return 'bg-red-950/40 border-red-500/20 text-red-400';
+        if (p === 'High') return 'bg-amber-950/40 border-amber-500/20 text-amber-400';
+        return 'bg-indigo-950/40 border-indigo-500/20 text-indigo-400';
+      };
+
+      return (
+        <div class="space-y-6">
+          {/* Header */}
+          <div class="flex justify-between items-start">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Supervisor Command Center</h2>
+              <p class="text-xs text-amber-400/70 mt-1">Oversee field teams, assign work orders, approve costs, and monitor asset health.</p>
+            </div>
+            <div class="flex gap-2">
+              {criticalCount > 0 && (
+                <span class="flex items-center gap-2 px-3 py-1.5 bg-red-950/40 border border-red-500/25 rounded-xl text-xs font-bold text-red-400 animate-pulse">
+                  <i data-lucide="alert-octagon" class="w-3.5 h-3.5"></i>
+                  {criticalCount} Critical Alert{criticalCount > 1 ? 's' : ''}
+                </span>
+              )}
+              <span class="flex items-center gap-2 px-3 py-1.5 bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-400">
+                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                {techUsers.length} Technicians On Team
+              </span>
+            </div>
+          </div>
+
+          {/* KPI Stats */}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-[#0d1326]/60 border border-amber-500/15 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-amber-400/50 text-[10px] uppercase font-bold">Unassigned</span>
+                <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <i data-lucide="inbox" class="w-4 h-4 text-amber-400"></i>
+                </div>
+              </div>
+              <h3 class="text-3xl font-black text-amber-400">{unassigned.length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">Awaiting assignment</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/15 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-indigo-400/50 text-[10px] uppercase font-bold">Active Jobs</span>
+                <div class="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                  <i data-lucide="zap" class="w-4 h-4 text-indigo-400"></i>
+                </div>
+              </div>
+              <h3 class="text-3xl font-black text-indigo-400">{activeJobs.length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">In progress</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-emerald-500/15 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-emerald-400/50 text-[10px] uppercase font-bold">Resolved</span>
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+              </div>
+              <h3 class="text-3xl font-black text-emerald-400">{resolved.length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">Completed this cycle</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-cyan-500/15 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-cyan-400/50 text-[10px] uppercase font-bold">Total Spend</span>
+                <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <i data-lucide="dollar-sign" class="w-4 h-4 text-cyan-400"></i>
+                </div>
+              </div>
+              <h3 class="text-3xl font-black text-cyan-400">${totalSpend.toLocaleString()}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">All maintenance costs</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2-col: Assignment Queue + Active Jobs */}
+            <div class="lg:col-span-2 space-y-5">
+
+              {/* Unassigned Issue Queue */}
+              <div class="bg-[#0d1326]/60 border border-amber-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <div class="flex items-center justify-between mb-5">
+                  <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="inbox" class="w-4 h-4 text-amber-400"></i>
+                    Assignment Queue
+                  </h4>
+                  {unassigned.length > 0 && (
+                    <span class="text-[10px] font-bold text-amber-400 bg-amber-950/30 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                      {unassigned.length} need assignment
+                    </span>
+                  )}
+                </div>
+                {unassigned.length === 0 ? (
+                  <div class="text-center py-8">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-950/30 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                      <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+                    </div>
+                    <p class="text-sm font-bold text-emerald-400">All Issues Assigned</p>
+                    <p class="text-xs text-slate-500 mt-1">No unassigned work orders in queue.</p>
+                  </div>
+                ) : (
+                  <div class="space-y-3">
+                    {unassigned.map(issue => {
+                      const asset = assets.find(a => a.id === issue.asset_id);
+                      return (
+                        <div key={issue.id} class="p-4 bg-[#060814]/60 border border-amber-500/10 rounded-xl hover:border-amber-500/25 transition-all group flex items-start gap-4">
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                              <span class="font-mono text-[10px] font-bold text-amber-400">{issue.issue_number}</span>
+                              <span class={`text-[10px] font-bold px-2 py-0.5 rounded border ${priorityBadge(issue.priority)}`}>{issue.priority}</span>
+                              <span class="text-[10px] bg-slate-900/60 border border-slate-700/30 text-slate-500 px-2 py-0.5 rounded-full font-bold">Unassigned</span>
+                            </div>
+                            <p class="text-sm font-bold text-white mt-1.5 truncate">{issue.title}</p>
+                            <p class="text-[10px] text-amber-400/40 mt-0.5">{asset ? asset.name + ' — ' + asset.location : ''}</p>
+                          </div>
+                          <button
+                            onClick={() => { setAssignModal(issue); setAssignTo(techUsers[0]?.username || ''); }}
+                            class="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-[10px] rounded-lg transition-all shadow-md shadow-amber-500/25 opacity-80 group-hover:opacity-100"
+                          >
+                            Assign →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Active Jobs Monitor */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <div class="flex items-center justify-between mb-5">
+                  <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+                    Active Work Monitor
+                  </h4>
+                  <span class="text-[10px] font-bold text-indigo-400 bg-indigo-950/30 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                    {activeJobs.length} in-progress
+                  </span>
+                </div>
+                {activeJobs.length === 0 ? (
+                  <p class="text-xs text-indigo-400/30 py-3">No active jobs in progress.</p>
+                ) : (
+                  <div class="space-y-2">
+                    {activeJobs.map(issue => {
+                      const tech = users.find(u => u.id === issue.technician_id);
+                      const asset = assets.find(a => a.id === issue.asset_id);
+                      const statusColors = {
+                        'Assigned': 'text-amber-400 bg-amber-950/30 border-amber-500/20',
+                        'Inspection Started': 'text-cyan-400 bg-cyan-950/30 border-cyan-500/20',
+                        'Maintenance In Progress': 'text-indigo-400 bg-indigo-950/30 border-indigo-500/20',
+                        'Waiting For Parts': 'text-orange-400 bg-orange-950/30 border-orange-500/20',
+                      };
+                      const sc = statusColors[issue.status] || 'text-slate-400 bg-slate-900/30 border-slate-700/20';
+                      return (
+                        <div key={issue.id} class="p-3 bg-[#060814]/50 border border-indigo-500/08 rounded-xl flex items-center gap-3">
+                          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                            <i data-lucide="wrench" class="w-4 h-4 text-indigo-400"></i>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                              <span class="font-mono text-[10px] font-bold text-indigo-400">{issue.issue_number}</span>
+                              <span class={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sc}`}>{issue.status}</span>
+                            </div>
+                            <p class="text-xs font-bold text-white truncate mt-0.5">{issue.title}</p>
+                          </div>
+                          <div class="text-right shrink-0">
+                            <div class="text-[10px] font-bold text-amber-400">{tech ? tech.username : 'Unassigned'}</div>
+                            <div class="text-[10px] text-slate-500">{asset ? asset.location : ''}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Maintenance Cost Records */}
+              {pendingCost.length > 0 && (
+                <div class="bg-[#0d1326]/60 border border-orange-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                  <h4 class="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                    <i data-lucide="receipt" class="w-4 h-4 text-orange-400"></i>
+                    Cost Approval Queue
+                    <span class="ml-2 text-[10px] font-bold text-orange-400 bg-orange-950/30 border border-orange-500/20 px-2 py-0.5 rounded-full">
+                      {pendingCost.length} pending
+                    </span>
+                  </h4>
+                  <div class="space-y-2">
+                    {pendingCost.map(m => {
+                      const asset = assets.find(a => a.id === m.asset_id);
+                      return (
+                        <div key={m.id} class="p-3 bg-[#060814]/50 border border-orange-500/10 rounded-xl flex items-center gap-3">
+                          <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold text-white">{asset ? asset.name : 'Unknown'}</div>
+                            <div class="text-[10px] text-slate-400 truncate mt-0.5">{m.notes}</div>
+                            <div class="text-[10px] text-orange-400/60 mt-0.5">by {m.technician_name} · {m.end_date}</div>
+                          </div>
+                          <div class="text-right shrink-0">
+                            <div class="text-sm font-black text-orange-400">${m.cost?.toLocaleString()}</div>
+                            <button
+                              onClick={() => setApproveModal(m)}
+                              class="mt-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded-lg transition-all"
+                            >
+                              Approve
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right column: Team Workload + Asset Health */}
+            <div class="space-y-5">
+              {/* Team Workload */}
+              <div class="bg-[#0d1326]/60 border border-amber-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
+                  Team Workload
+                </h4>
+                {techWorkload.length === 0 ? (
+                  <p class="text-xs text-amber-400/30">No technicians on team.</p>
+                ) : (
+                  <div class="space-y-3">
+                    {techWorkload.map(t => {
+                      const efficiency = t.done + t.open > 0 ? Math.round(t.done / (t.done + t.open) * 100) : 0;
+                      return (
+                        <div key={t.id} class="p-3 bg-[#060814]/50 border border-amber-500/08 rounded-xl">
+                          <div class="flex items-center gap-3 mb-2">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white font-black text-xs shadow-md">
+                              {t.username.replace('tech_','').charAt(0).toUpperCase()}
+                            </div>
+                            <div class="flex-1">
+                              <div class="text-xs font-bold text-white">{t.username}</div>
+                              <div class="text-[10px] text-amber-400/50">Field Technician</div>
+                            </div>
+                            <div class="text-right">
+                              <div class="text-[10px] font-black text-amber-400">{t.open} open</div>
+                              <div class="text-[10px] text-emerald-400">{t.done} done</div>
+                            </div>
+                          </div>
+                          {/* Efficiency bar */}
+                          <div class="mt-1">
+                            <div class="flex justify-between text-[10px] text-slate-500 mb-1">
+                              <span>Efficiency</span>
+                              <span class="text-amber-400 font-bold">{efficiency}%</span>
+                            </div>
+                            <div class="w-full h-1.5 rounded-full bg-slate-800/60">
+                              <div
+                                class="h-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all"
+                                style={{width: efficiency + '%'}}
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="mt-2 text-[10px] text-slate-500">
+                            Total billed: <span class="text-cyan-400 font-bold">${t.cost.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Asset Fleet Health */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+                  Fleet Health
+                </h4>
+                <div class="space-y-2.5">
+                  {assetHealth.map(item => (
+                    <div key={item.label} class={`flex items-center justify-between px-3 py-2.5 rounded-xl border ${item.bg}`}>
+                      <span class={`text-xs font-bold ${item.color}`}>{item.label}</span>
+                      <span class={`text-lg font-black ${item.color}`}>{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+                <div class="mt-4 pt-3 border-t border-indigo-500/10">
+                  <div class="text-[10px] text-slate-500 mb-1">Fleet Operational Rate</div>
+                  <div class="w-full h-2 rounded-full bg-slate-800/60">
+                    <div
+                      class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                      style={{width: (assets.filter(a=>a.status==='Operational').length / Math.max(assets.length,1) * 100) + '%'}}
+                    ></div>
+                  </div>
+                  <div class="text-xs font-black text-emerald-400 mt-1">
+                    {Math.round(assets.filter(a=>a.status==='Operational').length / Math.max(assets.length,1) * 100)}% Online
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Audit */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                  <i data-lucide="scroll" class="w-4 h-4 text-indigo-400"></i>
+                  Recent Activity
+                </h4>
+                <div class="space-y-2">
+                  {logs.slice(0, 5).map((log, idx) => {
+                    const asset = assets.find(a => a.id === log.asset_id);
+                    return (
+                      <div key={idx} class="flex gap-2 text-[10px]">
+                        <div class="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0"></div>
+                        <div>
+                          <span class="font-bold text-white">{log.action}</span>
+                          <span class="text-slate-500"> by {log.actor}</span>
+                          {asset && <span class="text-indigo-400/50"> on {asset.name}</span>}
+                          <div class="text-slate-600 font-mono">{new Date(log.timestamp).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Assign Modal */}
+          {assignModal && (
+            <div class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-amber-500/20 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-[#03050a]/60 animate-slide-up">
+                <div class="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 class="text-md font-bold text-white">Assign Work Order</h3>
+                    <p class="text-[10px] text-amber-400/60 mt-0.5">{assignModal.issue_number} — {assignModal.title}</p>
+                  </div>
+                  <button onClick={() => setAssignModal(null)} class="p-2 text-slate-500 hover:text-white rounded-xl hover:bg-[#121a32] transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <form onSubmit={handleAssign} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-amber-400/60 uppercase mb-1">Select Technician</label>
+                    <select
+                      value={assignTo}
+                      onChange={e => setAssignTo(e.target.value)}
+                      required
+                      class="w-full bg-[#060814] border border-amber-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50 transition-all"
+                    >
+                      <option value="">— Choose technician —</option>
+                      {techUsers.map(t => (
+                        <option key={t.id} value={t.username}>{t.username} (open jobs: {issues.filter(i=>i.technician_id===t.id&&!['Resolved','Closed'].includes(i.status)).length})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div class="p-3 bg-amber-950/20 border border-amber-500/15 rounded-xl text-xs text-amber-400/70">
+                    <strong class="text-amber-400">Issue Priority:</strong> {assignModal.priority} · Category: {assignModal.category}
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" onClick={() => setAssignModal(null)} class="flex-1 py-2 border border-slate-800 rounded-xl text-xs text-slate-400 bg-[#060814] hover:bg-[#121a32] transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/20">
+                      Confirm Assignment
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Approve Modal */}
+          {approveModal && (
+            <div class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-emerald-500/20 rounded-2xl w-full max-w-sm p-6 shadow-2xl shadow-[#03050a]/60 animate-slide-up">
+                <h3 class="text-md font-bold text-white mb-2">Approve Maintenance Cost</h3>
+                <div class="p-4 bg-emerald-950/20 border border-emerald-500/15 rounded-xl text-xs text-slate-300 mb-4 space-y-1">
+                  <div><span class="text-emerald-400 font-bold">Technician:</span> {approveModal.technician_name}</div>
+                  <div><span class="text-emerald-400 font-bold">Notes:</span> {approveModal.notes}</div>
+                  <div><span class="text-emerald-400 font-bold">Cost:</span> <span class="text-emerald-400 font-black text-sm">${approveModal.cost?.toLocaleString()}</span></div>
+                </div>
+                <div class="flex gap-2">
+                  <button onClick={() => setApproveModal(null)} class="flex-1 py-2 border border-slate-800 rounded-xl text-xs text-slate-400 bg-[#060814] hover:bg-[#121a32] transition-colors">Cancel</button>
+                  <button
+                    onClick={() => { notify(`Cost of $${approveModal.cost?.toLocaleString()} approved!`, 'success'); setApproveModal(null); }}
+                    class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-emerald-600/20"
+                  >
+                    ✓ Approve
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 12. Main Dispatcher Page
+    // 12. Technician Dashboard Page
+    function TechnicianPage({ issues, setIssues, maintenance, setMaintenance, assets, users, activeRole, addSystemLog, searchQuery }) {
+      const [activeTech, setActiveTech] = useState('tech_ali');
+      const [showLogModal, setShowLogModal] = useState(false);
+      const [selectedIssue, setSelectedIssue] = useState(null);
+      const [newStatus, setNewStatus] = useState('');
+      const [workNotes, setWorkNotes] = useState('');
+      const [partsUsed, setPartsUsed] = useState('');
+      const [workCost, setWorkCost] = useState('');
+      const [evidenceFile, setEvidenceFile] = useState(null);
+      const [uploadingEvidence, setUploadingEvidence] = useState(false);
+
+      const techUsers = users.filter(u => u.role === 'Technician');
+      const techUser = users.find(u => u.username === activeTech);
+
+      // My assigned issues
+      const myIssues = issues.filter(i => {
+        const techObj = users.find(u => u.username === activeTech);
+        return techObj && String(i.technician_id) === String(techObj.id);
+      });
+
+      // My completed maintenance
+      const myMaintenance = maintenance.filter(m => m.technician_name === activeTech);
+
+      const openIssues = myIssues.filter(i => !['Resolved','Closed'].includes(i.status));
+      const closedIssues = myIssues.filter(i => ['Resolved','Closed'].includes(i.status));
+      const totalCost = myMaintenance.reduce((s,m) => s + (m.cost || 0), 0);
+
+      const handleOpenWork = (issue) => {
+        setSelectedIssue(issue);
+        setNewStatus(issue.status);
+        setWorkNotes('');
+        setPartsUsed('');
+        setWorkCost('');
+        setEvidenceFile(null);
+        setShowLogModal(true);
+      };
+
+      const handleSubmitWork = async (e) => {
+        e.preventDefault();
+        if (!selectedIssue) return;
+        const linkedAsset = assets.find(a => String(a.id) === String(selectedIssue.asset_id));
+
+        let evidence_url = '';
+        if (evidenceFile) {
+          setUploadingEvidence(true);
+          try {
+            const fd = new FormData();
+            fd.append('file', evidenceFile);
+            const upRes = await apiFetch('/api/upload', { method: 'POST', body: fd });
+            const upData = await upRes.json();
+            if (upRes.ok) evidence_url = upData.url;
+            else notify(`Evidence upload skipped: ${upData.error}`, 'warning');
+          } catch (err) {
+            notify('Evidence upload failed. Continuing without it.', 'warning');
+          }
+          setUploadingEvidence(false);
+        }
+
+        // Update issue status
+        setIssues(prev => prev.map(i =>
+          String(i.id) === String(selectedIssue.id) ? { ...i, status: newStatus, updated_at: new Date().toISOString() } : i
+        ));
+
+        // Log maintenance record if notes provided
+        if (workNotes.trim()) {
+          const record = {
+            id: Date.now(),
+            asset_id: selectedIssue.asset_id,
+            issue_id: selectedIssue.id,
+            notes: workNotes,
+            parts_used: partsUsed,
+            cost: Number(workCost) || 0,
+            evidence_url,
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: new Date().toISOString().split('T')[0],
+            technician_name: activeTech,
+            status: newStatus === 'Resolved' ? 'Completed' : 'In Progress'
+          };
+          setMaintenance(prev => [record, ...prev]);
+        }
+
+        addSystemLog(
+          selectedIssue.asset_id,
+          activeTech,
+          'Work Update',
+          `Technician ${activeTech} updated issue ${selectedIssue.issue_number} to "${newStatus}". ${workNotes ? 'Notes: ' + workNotes.substring(0,60) : ''}`
+        );
+
+        notify(`Work order ${selectedIssue.issue_number} updated to "${newStatus}"!`, 'success');
+        setShowLogModal(false);
+        setSelectedIssue(null);
+      };
+
+      const statusColor = (s) => {
+        if (s === 'Resolved' || s === 'Closed') return 'bg-emerald-950/40 border-emerald-500/20 text-emerald-400';
+        if (s === 'Maintenance In Progress') return 'bg-indigo-950/40 border-indigo-500/20 text-indigo-400';
+        if (s === 'Inspection Started') return 'bg-cyan-950/40 border-cyan-500/20 text-cyan-400';
+        if (s === 'Assigned') return 'bg-amber-950/40 border-amber-500/20 text-amber-400';
+        return 'bg-slate-900/40 border-slate-700/30 text-slate-400';
+      };
+
+      const priorityColor = (p) => {
+        if (p === 'Critical') return 'bg-red-950/40 border-red-500/20 text-red-400';
+        if (p === 'High') return 'bg-amber-950/40 border-amber-500/20 text-amber-400';
+        return 'bg-indigo-950/40 border-indigo-500/20 text-indigo-400';
+      };
+
+      return (
+        <div class="space-y-6">
+          {/* Header */}
+          <div class="flex justify-between items-start">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Technician Workshop</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Manage assigned work orders, log field service notes, and track completion.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-[10px] font-bold text-indigo-400/50 uppercase tracking-wider">Active Tech:</span>
+              <select
+                value={activeTech}
+                onChange={e => setActiveTech(e.target.value)}
+                class="bg-[#060814] border border-indigo-500/20 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all"
+              >
+                {techUsers.map(t => (
+                  <option key={t.id} value={t.username}>{t.username}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <span class="block text-indigo-400/50 text-[10px] uppercase font-bold mb-1">Open Work Orders</span>
+              <h3 class="text-3xl font-black text-amber-400">{openIssues.length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">Pending resolution</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <span class="block text-indigo-400/50 text-[10px] uppercase font-bold mb-1">Completed Jobs</span>
+              <h3 class="text-3xl font-black text-emerald-400">{closedIssues.length + myMaintenance.filter(m=>m.status==='Completed').length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">This cycle</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <span class="block text-indigo-400/50 text-[10px] uppercase font-bold mb-1">Service Records</span>
+              <h3 class="text-3xl font-black text-indigo-400">{myMaintenance.length}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">Maintenance logs filed</p>
+            </div>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel hover-glow transition-all">
+              <span class="block text-indigo-400/50 text-[10px] uppercase font-bold mb-1">Total Labor Cost</span>
+              <h3 class="text-3xl font-black text-cyan-400">${totalCost.toLocaleString()}</h3>
+              <p class="text-[10px] text-slate-500 mt-1">Parts & labour</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Active Work Orders */}
+            <div class="lg:col-span-2 space-y-4">
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <div class="flex items-center justify-between mb-5">
+                  <h4 class="text-sm font-bold text-white">Active Work Orders</h4>
+                  <span class="text-[10px] font-bold text-amber-400 bg-amber-950/30 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    {openIssues.length} pending
+                  </span>
+                </div>
+
+                {openIssues.length === 0 ? (
+                  <div class="text-center py-10">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-950/40 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                      <i data-lucide="check-circle" class="w-6 h-6 text-emerald-400"></i>
+                    </div>
+                    <p class="text-sm font-bold text-emerald-400">All Clear!</p>
+                    <p class="text-xs text-slate-500 mt-1">No active work orders assigned.</p>
+                  </div>
+                ) : (
+                  <div class="space-y-3">
+                    {openIssues.map(issue => {
+                      const linkedAsset = assets.find(a => a.id === issue.asset_id);
+                      return (
+                        <div key={issue.id} class="p-4 bg-[#060814]/60 border border-indigo-500/10 rounded-xl hover:border-indigo-500/25 transition-all group">
+                          <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-mono text-[10px] font-bold text-indigo-400">{issue.issue_number}</span>
+                                <span class={`text-[10px] font-bold px-2 py-0.5 rounded border ${priorityColor(issue.priority)}`}>
+                                  {issue.priority}
+                                </span>
+                                <span class={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(issue.status)}`}>
+                                  {issue.status}
+                                </span>
+                              </div>
+                              <p class="text-sm font-bold text-white mt-1.5 truncate">{issue.title}</p>
+                              {linkedAsset && (
+                                <p class="text-[10px] text-indigo-400/50 mt-0.5">
+                                  <i data-lucide="package" class="w-3 h-3 inline-block mr-1"></i>
+                                  {linkedAsset.name} — {linkedAsset.location}
+                                </p>
+                              )}
+                              <p class="text-xs text-slate-400 mt-1 line-clamp-2">{issue.description}</p>
+                            </div>
+                            <button
+                              onClick={() => handleOpenWork(issue)}
+                              class="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-lg transition-all shadow-md shadow-indigo-600/20 opacity-80 group-hover:opacity-100"
+                            >
+                              Update Work
+                            </button>
+                          </div>
+
+                          {/* AI Diagnostic Hints */}
+                          {issue.ai_used === 1 && issue.ai_diagnostic_checks && (() => {
+                            try {
+                              const checks = JSON.parse(issue.ai_diagnostic_checks);
+                              return (
+                                <div class="mt-3 p-3 bg-indigo-950/30 border border-indigo-500/15 rounded-xl">
+                                  <p class="text-[10px] font-bold text-indigo-400 mb-1.5 flex items-center gap-1">
+                                    <i data-lucide="cpu" class="w-3 h-3"></i> AI Diagnostic Checklist
+                                  </p>
+                                  <ul class="space-y-0.5">
+                                    {checks.slice(0,3).map((c,idx) => (
+                                      <li key={idx} class="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                        <span class="w-1 h-1 rounded-full bg-indigo-500 shrink-0"></span>{c}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            } catch(e) { return null; }
+                          })()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Maintenance History */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4">My Maintenance History</h4>
+                {myMaintenance.length === 0 ? (
+                  <p class="text-xs text-indigo-400/40 py-2">No maintenance records logged yet.</p>
+                ) : (
+                  <div class="space-y-3">
+                    {myMaintenance.map(m => {
+                      const linkedAsset = assets.find(a => a.id === m.asset_id);
+                      return (
+                        <div key={m.id} class="p-4 bg-[#060814]/50 border border-indigo-500/10 rounded-xl text-xs">
+                          <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                              <div class="font-bold text-white">{linkedAsset ? linkedAsset.name : 'Unknown Asset'}</div>
+                              <div class="text-slate-400 mt-1">{m.notes}</div>
+                              {m.parts_used && (
+                                <div class="text-indigo-400/60 mt-1 text-[10px]">
+                                  <i data-lucide="tool" class="w-3 h-3 inline-block mr-1"></i>Parts: {m.parts_used}
+                                </div>
+                              )}
+                            </div>
+                            <div class="text-right shrink-0 ml-3">
+                              <div class="font-mono font-bold text-emerald-400 text-sm">${m.cost.toLocaleString()}</div>
+                              <div class="text-[10px] text-indigo-400/40 mt-1 font-mono">{m.end_date}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Profile + Resolved */}
+            <div class="space-y-4">
+              {/* Tech Profile Card */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
+                <div class="flex flex-col items-center text-center">
+                  <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-2xl font-black text-white shadow-lg shadow-indigo-500/30 mb-3">
+                    {activeTech.replace('tech_', '').charAt(0).toUpperCase()}
+                  </div>
+                  <h3 class="font-bold text-white text-sm">{activeTech}</h3>
+                  <span class="text-[10px] mt-1 bg-cyan-950/40 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-bold">Field Technician</span>
+                </div>
+                <div class="mt-4 space-y-2">
+                  <div class="flex justify-between text-xs py-2 border-b border-indigo-500/10">
+                    <span class="text-indigo-400/50 font-bold">Open Jobs</span>
+                    <span class="text-amber-400 font-bold">{openIssues.length}</span>
+                  </div>
+                  <div class="flex justify-between text-xs py-2 border-b border-indigo-500/10">
+                    <span class="text-indigo-400/50 font-bold">Completed</span>
+                    <span class="text-emerald-400 font-bold">{closedIssues.length}</span>
+                  </div>
+                  <div class="flex justify-between text-xs py-2">
+                    <span class="text-indigo-400/50 font-bold">Total Billed</span>
+                    <span class="text-cyan-400 font-bold">${totalCost.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Completed Jobs */}
+              <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-5 glass-panel shadow-xl shadow-[#03050a]/40">
+                <h4 class="text-sm font-bold text-white mb-4">Resolved Work Orders</h4>
+                {closedIssues.length === 0 ? (
+                  <p class="text-xs text-indigo-400/40 py-2">No resolved issues yet.</p>
+                ) : (
+                  <div class="space-y-2">
+                    {closedIssues.map(issue => (
+                      <div key={issue.id} class="p-3 bg-emerald-950/20 border border-emerald-500/15 rounded-xl text-xs">
+                        <div class="font-mono font-bold text-emerald-400 text-[10px]">{issue.issue_number}</div>
+                        <div class="font-bold text-white mt-0.5 text-xs truncate">{issue.title}</div>
+                        <div class="text-[10px] text-emerald-400/60 mt-0.5">{issue.status}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Work Update Modal */}
+          {showLogModal && selectedIssue && (
+            <div class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div class="bg-[#0d1326] border border-indigo-500/15 rounded-2xl w-full max-w-lg p-6 shadow-2xl shadow-[#03050a]/60 animate-slide-up">
+                <div class="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 class="text-md font-bold text-white">Log Work Progress</h3>
+                    <p class="text-[10px] text-indigo-400/60 mt-0.5">Ticket: {selectedIssue.issue_number} — {selectedIssue.title}</p>
+                  </div>
+                  <button onClick={() => setShowLogModal(false)} class="p-2 text-slate-500 hover:text-white rounded-xl hover:bg-[#121a32] transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitWork} class="space-y-4">
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Update Status</label>
+                    <select
+                      value={newStatus}
+                      onChange={e => setNewStatus(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all"
+                    >
+                      <option value="Assigned">Assigned</option>
+                      <option value="Inspection Started">Inspection Started</option>
+                      <option value="Maintenance In Progress">Maintenance In Progress</option>
+                      <option value="Waiting For Parts">Waiting For Parts</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Field Work Notes *</label>
+                    <textarea
+                      rows="3"
+                      placeholder="Describe the work performed, observations, findings..."
+                      value={workNotes}
+                      onChange={e => setWorkNotes(e.target.value)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-indigo-400/20 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Parts Used</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Gasket set x2"
+                        value={partsUsed}
+                        onChange={e => setPartsUsed(e.target.value)}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-indigo-400/20 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Labor Cost ($)</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={workCost}
+                        onChange={e => setWorkCost(e.target.value)}
+                        class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-indigo-400/20 focus:outline-none focus:border-indigo-500/50 focus:bg-[#090d19] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] font-bold text-indigo-400/60 uppercase mb-1">Evidence Photo/Video (optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*,video/mp4,video/quicktime,video/webm"
+                      onChange={e => setEvidenceFile(e.target.files[0] || null)}
+                      class="w-full bg-[#060814] border border-indigo-500/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all"
+                    />
+                  </div>
+
+                  <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onClick={() => setShowLogModal(false)} class="px-4 py-2 border border-indigo-500/15 rounded-xl text-xs text-indigo-400 hover:bg-[#121a32] bg-[#060814] transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={uploadingEvidence} class="px-4 py-2 bg-indigo-600 disabled:opacity-50 rounded-xl text-xs font-bold text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+                      {uploadingEvidence ? 'Uploading...' : 'Submit Work Log'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function PageComponent({
+      activeTab, setActiveTab,
+      assets, setAssets,
+      issues, setIssues,
+      maintenance, setMaintenance,
+      logs, setLogs,
+      users, setUsers,
+      stats, searchQuery,
+      inspectedAsset, setInspectedAsset,
+      addSystemLog, activeRole,
+      handleInspectAsset
+    }) {
+      
+      useEffect(() => {
+        lucide.createIcons();
+      }, [activeTab]);
+
+      const renderTabContent = () => {
+        switch (activeTab) {
+          case 'dashboard':
+            return <DashboardPage stats={stats} logs={logs} assets={assets} setActiveTab={setActiveTab} />;
+          case 'assets':
+            return <AssetsPage assets={assets} setAssets={setAssets} searchQuery={searchQuery} handleInspectAsset={handleInspectAsset} activeRole={activeRole} addSystemLog={addSystemLog} />;
+          case 'asset-details':
+            return <AssetDetailsPage inspectedAsset={inspectedAsset} issues={issues} maintenance={maintenance} activeRole={activeRole} setActiveTab={setActiveTab} />;
+          case 'issues':
+            return <IssuesPage issues={issues} setIssues={setIssues} assets={assets} setAssets={setAssets} users={users} searchQuery={searchQuery} activeRole={activeRole} addSystemLog={addSystemLog} />;
+          case 'maintenance':
+            return <MaintenancePage maintenance={maintenance} setMaintenance={setMaintenance} assets={assets} setAssets={setAssets} users={users} searchQuery={searchQuery} activeRole={activeRole} addSystemLog={addSystemLog} />;
+          case 'qr':
+            return <QrCodesPage assets={assets} />;
+          case 'analytics':
+            return <AnalyticsPage />;
+          case 'history':
+            return <HistoryPage logs={logs} searchQuery={searchQuery} />;
+          case 'users':
+            return <UsersPage users={users} setUsers={setUsers} activeRole={activeRole} searchQuery={searchQuery} />;
+          case 'settings':
+            return <SettingsPage />;
+          case 'technician':
+            return <TechnicianPage issues={issues} setIssues={setIssues} maintenance={maintenance} setMaintenance={setMaintenance} assets={assets} users={users} activeRole={activeRole} addSystemLog={addSystemLog} searchQuery={searchQuery} />;
+          case 'supervisor':
+            return <SupervisorPage issues={issues} setIssues={setIssues} maintenance={maintenance} assets={assets} users={users} logs={logs} addSystemLog={addSystemLog} />;
+          case 'preview-public':
+            return <PublicScannerPage assets={assets} setAssets={setAssets} issues={issues} setIssues={setIssues} addSystemLog={addSystemLog} />;
+          default:
+            return <DashboardPage stats={stats} logs={logs} assets={assets} setActiveTab={setActiveTab} />;
+        }
+      };
+
+      return (
+        <div key={activeTab} class="animate-slide-up">
+          {renderTabContent()}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN APP COMPONENT
+    // ==========================================
+    const API_BASE = window.location.port === '8000' ? 'http://localhost:5000' : '';
+
+    // ── Attach the logged-in JWT to every backend call, and bounce to login on 401 ──
+    function authHeaders() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('maintainiq_auth') || 'null');
+        return saved && saved.token ? { Authorization: `Bearer ${saved.token}` } : {};
+      } catch {
+        return {};
+      }
+    }
+    async function apiFetch(path, options = {}) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: { ...(options.headers || {}), ...authHeaders() },
+      });
+      if (res.status === 401) {
+        localStorage.removeItem('maintainiq_auth');
+        localStorage.removeItem('maintainiq_active_role');
+        window.location.replace('../auth.html');
+        throw new Error('Session expired. Redirecting to login.');
+      }
+      return res;
+    }
+
+    function App() {
+      const [assets, setAssetsState] = useState([]);
+      const [issues, setIssuesState] = useState([]);
+      const [maintenance, setMaintenanceState] = useState([]);
+      const [logs, setLogsState] = useState([]);
+      const [users, setUsersState] = useState([]);
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [inspectedAsset, setInspectedAsset] = useState(null);
+      const [toasts, setToasts] = useState([]);
+      const [activeRole, setActiveRole] = useState(() => {
+        // Read role from auth guard
+        const authUser = window.__AUTH_USER__;
+        if (authUser && authUser.role) return authUser.role;
+        return localStorage.getItem('maintainiq_active_role') || 'Admin';
+      });
+      const [currentUser, setCurrentUser] = useState(() => window.__AUTH_USER__ || null);
+      const [isBackendConnected, setIsBackendConnected] = useState(false);
+
+      const refreshData = async () => {
+        try {
+          const resA = await apiFetch('/api/assets');
+          if (!resA.ok) throw new Error('API server down');
+          const dataA = await resA.json();
+          setAssetsState(dataA);
+
+          const resI = await apiFetch('/api/issues');
+          const dataI = await resI.json();
+          setIssuesState(dataI);
+
+          const resM = await apiFetch('/api/maintenance');
+          const dataM = await resM.json();
+          setMaintenanceState(dataM);
+
+          const resL = await apiFetch('/api/logs');
+          const dataL = await resL.json();
+          setLogsState(dataL);
+
+          const resU = await apiFetch('/api/users');
+          const dataU = await resU.json();
+          setUsersState(dataU);
+
+          setIsBackendConnected(true);
+        } catch (e) {
+          console.warn("Backend down or MongoDB disconnected. Falling back to local state.", e);
+          setIsBackendConnected(false);
+          
+          // Local fallback initialization
+          const localAssets = localStorage.getItem('maintainiq_assets');
+          setAssetsState(localAssets ? JSON.parse(localAssets) : DEFAULT_ASSETS);
+          const localIssues = localStorage.getItem('maintainiq_issues');
+          setIssuesState(localIssues ? JSON.parse(localIssues) : DEFAULT_ISSUES);
+          const localMaint = localStorage.getItem('maintainiq_maint');
+          setMaintenanceState(localMaint ? JSON.parse(localMaint) : DEFAULT_MAINTENANCE);
+          const localLogs = localStorage.getItem('maintainiq_logs');
+          setLogsState(localLogs ? JSON.parse(localLogs) : DEFAULT_LOGS);
+          const localUsers = localStorage.getItem('maintainiq_users');
+          setUsersState(localUsers ? JSON.parse(localUsers) : DEFAULT_USERS);
+        }
+      };
+
+      useEffect(() => {
+        refreshData();
+      }, []);
+
+      // If backend is down, we sync fallback state to localStorage
+      useEffect(() => {
+        if (!isBackendConnected && assets.length > 0) {
+          localStorage.setItem('maintainiq_assets', JSON.stringify(assets));
+        }
+      }, [assets, isBackendConnected]);
+      useEffect(() => {
+        if (!isBackendConnected && issues.length > 0) {
+          localStorage.setItem('maintainiq_issues', JSON.stringify(issues));
+        }
+      }, [issues, isBackendConnected]);
+      useEffect(() => {
+        if (!isBackendConnected && maintenance.length > 0) {
+          localStorage.setItem('maintainiq_maint', JSON.stringify(maintenance));
+        }
+      }, [maintenance, isBackendConnected]);
+      useEffect(() => {
+        if (!isBackendConnected && logs.length > 0) {
+          localStorage.setItem('maintainiq_logs', JSON.stringify(logs));
+        }
+      }, [logs, isBackendConnected]);
+      useEffect(() => {
+        if (!isBackendConnected && users.length > 0) {
+          localStorage.setItem('maintainiq_users', JSON.stringify(users));
+        }
+      }, [users, isBackendConnected]);
+
+      // State setter wrappers to auto-post updates to MongoDB backend
+      const setAssets = async (action) => {
+        const nextVal = typeof action === 'function' ? action(assets) : action;
+        if (!isBackendConnected) {
+          setAssetsState(nextVal);
+          return;
+        }
+        
+        try {
+          if (nextVal.length > assets.length) {
+            const added = nextVal.find(x => !assets.some(y => String(y.id) === String(x.id)));
+            if (added) {
+              await apiFetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...added, actor: activeRole })
+              });
+            }
+          } else if (nextVal.length < assets.length) {
+            const deleted = assets.find(x => !nextVal.some(y => String(y.id) === String(x.id)));
+            if (deleted) {
+              await apiFetch(`/api/assets/${deleted.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actor: activeRole })
+              });
+            }
+          } else {
+            for (let fresh of nextVal) {
+              const old = assets.find(x => String(x.id) === String(fresh.id));
+              if (old && JSON.stringify(fresh) !== JSON.stringify(old)) {
+                await apiFetch(`/api/assets/${fresh.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ...fresh, actor: activeRole })
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("API error mutating assets:", err);
+        }
+        refreshData();
+      };
+
+      const setIssues = async (action) => {
+        const nextVal = typeof action === 'function' ? action(issues) : action;
+        if (!isBackendConnected) {
+          setIssuesState(nextVal);
+          return;
+        }
+
+        try {
+          if (nextVal.length > issues.length) {
+            const added = nextVal.find(x => !issues.some(y => String(y.id) === String(x.id)));
+            if (added) {
+              await apiFetch('/api/issues', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(added)
+              });
+            }
+          } else {
+            for (let fresh of nextVal) {
+              const old = issues.find(x => String(x.id) === String(fresh.id));
+              if (old && JSON.stringify(fresh) !== JSON.stringify(old)) {
+                await apiFetch(`/api/issues/${fresh.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ...fresh, actor: activeRole })
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("API error mutating issues:", err);
+        }
+        refreshData();
+      };
+
+      const setMaintenance = async (action) => {
+        const nextVal = typeof action === 'function' ? action(maintenance) : action;
+        if (!isBackendConnected) {
+          setMaintenanceState(nextVal);
+          return;
+        }
+
+        try {
+          if (nextVal.length > maintenance.length) {
+            const added = nextVal.find(x => !maintenance.some(y => String(y.id) === String(x.id)));
+            if (added) {
+              await apiFetch('/api/maintenance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(added)
+              });
+            }
+          }
+        } catch (err) {
+          console.error("API error mutating maintenance:", err);
+        }
+        refreshData();
+      };
+
+      const setUsers = async (action) => {
+        const nextVal = typeof action === 'function' ? action(users) : action;
+        if (!isBackendConnected) {
+          setUsersState(nextVal);
+          return;
+        }
+
+        try {
+          if (nextVal.length > users.length) {
+            const added = nextVal.find(x => !users.some(y => String(y.id) === String(x.id)));
+            if (added) {
+              await apiFetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(added)
+              });
+            }
+          }
+        } catch (err) {
+          console.error("API error mutating users:", err);
+        }
+        refreshData();
+      };
+
+      useEffect(() => {
+        const addToast = (message, type) => {
+          const id = Date.now();
+          setToasts(prev => [...prev, { id, message, type }]);
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+          }, 4000);
+        };
+        toastListeners.push(addToast);
+        return () => {
+          toastListeners = toastListeners.filter(l => l !== addToast);
+        };
+      }, []);
+
+      const resetAllData = async () => {
+        if(confirm('Are you sure you want to reset all MongoDB and local databases back to default hackathon settings?')) {
+          if (isBackendConnected) {
+            try {
+              const res = await apiFetch('/api/health/reset', { method: 'POST' });
+              if (res.ok) {
+                notify('MongoDB databases reset successfully!', 'success');
+              } else {
+                throw new Error('Server reset failed');
+              }
+            } catch (err) {
+              notify('Server reset failed. Cleaning local state instead.', 'warning');
+            }
+          }
+          
+          localStorage.setItem('maintainiq_assets', JSON.stringify(DEFAULT_ASSETS));
+          localStorage.setItem('maintainiq_issues', JSON.stringify(DEFAULT_ISSUES));
+          localStorage.setItem('maintainiq_maint', JSON.stringify(DEFAULT_MAINTENANCE));
+          localStorage.setItem('maintainiq_logs', JSON.stringify(DEFAULT_LOGS));
+          localStorage.setItem('maintainiq_users', JSON.stringify(DEFAULT_USERS));
+          
+          refreshData();
+          notify('System databases reset successfully!', 'success');
+        }
+      };
+
+      const addSystemLog = async (assetId, actor, action, details) => {
+        if (isBackendConnected) {
+          try {
+            await apiFetch('/api/logs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ asset_id: assetId || null, actor, action, details })
+            });
+            refreshData();
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          const newLog = {
+            id: Date.now(),
+            asset_id: assetId,
+            timestamp: new Date().toISOString(),
+            actor: actor,
+            action: action,
+            details: details
+          };
+          setLogsState(prev => [newLog, ...prev]);
+        }
+      };
+
+      const handleInspectAsset = (asset) => {
+        setInspectedAsset(asset);
+        setActiveTab('asset-details');
+      };
+
+      const stats = {
+        totalAssets: assets.length,
+        activeIssues: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Closed').length,
+        pendingMaint: issues.filter(i => ['Assigned', 'Inspection Started', 'Maintenance In Progress'].includes(i.status)).length,
+        operationalRate: parseFloat((assets.filter(a => a.status === 'Operational').length / assets.length * 100).toFixed(1)) || 0,
+      };
+
+      // Auto-redirect when role changes
+      useEffect(() => {
+        if (activeRole === 'Technician') {
+          setActiveTab('technician');
+        } else if (activeRole === 'Supervisor') {
+          setActiveTab('supervisor');
+        } else {
+          if (['technician','supervisor'].includes(activeTab)) setActiveTab('dashboard');
+        }
+      }, [activeRole]);
+
+      const isTechRole = activeRole === 'Technician';
+      const isSupervisorRole = activeRole === 'Supervisor';
+
+      return (
+        <div class="flex h-screen overflow-hidden">
+          {/* TOAST CONTAINER */}
+          <div class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
+            {toasts.map(t => (
+              <div key={t.id} class={`pointer-events-auto px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border min-w-[280px] text-sm ${
+                t.type === 'success' ? 'bg-emerald-950/80 border-emerald-500/35 text-emerald-300' :
+                t.type === 'warning' ? 'bg-amber-950/80 border-amber-500/35 text-amber-300' :
+                'bg-slate-900/80 border-brand-border text-slate-100'
+              }`}>
+                <span class="font-semibold">{t.message}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* ============================================================ */}
+          {/* ROLE-BASED SIDEBARS                                           */}
+          {/* ============================================================ */}
+          {isTechRole ? (
+            <aside class="w-64 bg-[#060f1a]/95 border border-cyan-500/15 flex flex-col shrink-0 m-4 mr-0 rounded-3xl shadow-2xl shadow-[#03050a]/60 backdrop-blur-md">
+              {/* Logo */}
+              <div class="p-6 border-b border-cyan-500/15 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-cyan-500/30">
+                  <i data-lucide="hard-hat" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h1 class="font-extrabold text-md tracking-tight text-white">
+                    Maintain<span class="text-cyan-400 font-black">IQ</span>
+                  </h1>
+                  <p class="text-[10px] text-cyan-400/60 font-semibold tracking-wider uppercase">Technician Portal</p>
+                </div>
+              </div>
+
+              {/* Role Badge */}
+              <div class="mx-4 mt-4 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-xl flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-teal-500 flex items-center justify-center text-white font-black text-sm shadow-md">
+                  T
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">Field Technician</div>
+                  <div class="text-[10px] text-cyan-400/60 font-semibold">Active Session</div>
+                </div>
+                <div class="ml-auto w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+              </div>
+
+              {/* Tech Nav */}
+              <nav class="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+                <p class="px-3 text-[10px] font-bold text-cyan-400/40 tracking-widest uppercase mb-2">My Workspace</p>
+
+                <button onClick={() => setActiveTab('technician')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'technician' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                  My Dashboard
+                  {issues.filter(i => !['Resolved','Closed'].includes(i.status) && i.technician_id !== null).length > 0 && (
+                    <span class="ml-auto bg-cyan-500 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                      {issues.filter(i => !['Resolved','Closed'].includes(i.status) && i.technician_id !== null).length}
+                    </span>
+                  )}
+                </button>
+
+                <button onClick={() => setActiveTab('maintenance')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'maintenance' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                  My Service Logs
+                </button>
+
+                <button onClick={() => setActiveTab('assets')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'assets' || activeTab === 'asset-details' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="package" class="w-4 h-4"></i>
+                  Asset Lookup
+                </button>
+
+                <div class="pt-4">
+                  <p class="px-3 text-[10px] font-bold text-cyan-400/40 tracking-widest uppercase mb-2">Field Tools</p>
+
+                  <button onClick={() => setActiveTab('preview-public')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === 'preview-public' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}>
+                    <i data-lucide="scan-line" class="w-4 h-4"></i>
+                    QR Scanner
+                  </button>
+
+                  <button onClick={() => setActiveTab('qr')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === 'qr' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                  }`}>
+                    <i data-lucide="qr-code" class="w-4 h-4"></i>
+                    QR Label Print
+                  </button>
+                </div>
+              </nav>
+
+              {/* Tech Footer */}
+              <div class="p-4 border-t border-cyan-500/10 bg-cyan-950/10 flex flex-col gap-2">
+                {/* User Profile */}
+                <div class="flex items-center gap-2 p-2.5 bg-[#060814] border border-cyan-500/15 rounded-xl">
+                  <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-teal-500 flex items-center justify-center text-white font-black text-sm shrink-0 shadow">
+                    {currentUser ? currentUser.username[0].toUpperCase() : 'T'}
+                  </div>
+                  <div class="overflow-hidden">
+                    <div class="text-xs font-bold text-white truncate">{currentUser ? currentUser.full_name || currentUser.username : 'Technician'}</div>
+                    <div class="text-[10px] text-cyan-400/60 font-semibold">Technician</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { localStorage.removeItem('maintainiq_auth'); window.location.replace('../auth.html'); }}
+                  class="w-full py-2 text-[10px] font-bold text-red-400/70 border border-red-900/20 rounded-xl bg-[#060814] hover:text-red-400 hover:border-red-900/40 hover:bg-red-950/10 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <i data-lucide="log-out" class="w-3 h-3"></i> Sign Out
+                </button>
+              </div>
+            </aside>
+
+          ) : isSupervisorRole ? (
+          /* ============================================================ */
+          /* SUPERVISOR SIDEBAR                                            */
+          /* ============================================================ */
+          <aside class="w-64 bg-[#100a02]/95 border border-amber-500/15 flex flex-col shrink-0 m-4 mr-0 rounded-3xl shadow-2xl shadow-[#03050a]/60 backdrop-blur-md">
+            <div class="p-6 border-b border-amber-500/15 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-white shadow-md shadow-amber-500/30">
+                <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h1 class="font-extrabold text-md tracking-tight text-white">
+                  Maintain<span class="text-amber-400 font-black">IQ</span>
+                </h1>
+                <p class="text-[10px] text-amber-400/60 font-semibold tracking-wider uppercase">Supervisor Portal</p>
+              </div>
+            </div>
+
+            {/* Supervisor Badge */}
+            <div class="mx-4 mt-4 p-3 bg-amber-950/30 border border-amber-500/20 rounded-xl flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white font-black text-sm shadow-md">
+                S
+              </div>
+              <div>
+                <div class="text-xs font-bold text-white">Supervisor</div>
+                <div class="text-[10px] text-amber-400/60 font-semibold">Command Access</div>
+              </div>
+              <div class="ml-auto w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+            </div>
+
+            <nav class="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+              <p class="px-3 text-[10px] font-bold text-amber-400/40 tracking-widest uppercase mb-2">Command</p>
+
+              <button onClick={() => setActiveTab('supervisor')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'supervisor' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                Command Center
+                {issues.filter(i => !i.technician_id && !['Resolved','Closed'].includes(i.status)).length > 0 && (
+                  <span class="ml-auto bg-amber-500 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                    {issues.filter(i => !i.technician_id && !['Resolved','Closed'].includes(i.status)).length}
+                  </span>
+                )}
+              </button>
+
+              <button onClick={() => setActiveTab('issues')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'issues' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                Issues Desk
+                {stats.activeIssues > 0 && (
+                  <span class="ml-auto bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                    {stats.activeIssues}
+                  </span>
+                )}
+              </button>
+
+              <button onClick={() => setActiveTab('maintenance')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'maintenance' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                Maintenance Logs
+              </button>
+
+              <button onClick={() => setActiveTab('assets')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'assets' || activeTab === 'asset-details' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="package" class="w-4 h-4"></i>
+                Asset Fleet
+              </button>
+
+              <div class="pt-4">
+                <p class="px-3 text-[10px] font-bold text-amber-400/40 tracking-widest uppercase mb-2">Reports</p>
+                <button onClick={() => setActiveTab('analytics')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'analytics' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+                  Analytics
+                </button>
+                <button onClick={() => setActiveTab('history')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'history' ? 'bg-amber-600/15 border border-amber-500/30 text-amber-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="history" class="w-4 h-4"></i>
+                  Audit Ledger
+                </button>
+              </div>
+            </nav>
+
+            <div class="p-4 border-t border-amber-500/10 bg-amber-950/10 flex flex-col gap-2">
+              <div class="flex items-center gap-2 p-2.5 bg-[#060814] border border-amber-500/15 rounded-xl">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white font-black text-sm shrink-0 shadow">
+                  {currentUser ? currentUser.username[0].toUpperCase() : 'S'}
+                </div>
+                <div class="overflow-hidden">
+                  <div class="text-xs font-bold text-white truncate">{currentUser ? currentUser.full_name || currentUser.username : 'Supervisor'}</div>
+                  <div class="text-[10px] text-amber-400/60 font-semibold">Supervisor</div>
+                </div>
+              </div>
+              <button
+                onClick={() => { localStorage.removeItem('maintainiq_auth'); window.location.replace('../auth.html'); }}
+                class="w-full py-2 text-[10px] font-bold text-red-400/70 border border-red-900/20 rounded-xl bg-[#060814] hover:text-red-400 hover:border-red-900/40 hover:bg-red-950/10 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <i data-lucide="log-out" class="w-3 h-3"></i> Sign Out
+              </button>
+            </div>
+          </aside>
+
+          ) : (
+          /* ============================================================ */
+          /* ADMIN SIDEBAR                                                 */
+          /* ============================================================ */
+          <aside class="w-64 bg-[#0c1020]/90 border border-slate-850 flex flex-col shrink-0 m-4 mr-0 rounded-3xl shadow-2xl shadow-[#03050a]/60 backdrop-blur-md">
+            <div class="p-6 border-b border-slate-850 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-white shadow-md">
+                <i data-lucide="wrench" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h1 class="font-extrabold text-md tracking-tight text-white">
+                  Maintain<span class="text-indigo-400 font-black">IQ</span>
+                </h1>
+                <p class="text-[10px] text-indigo-400/70 font-semibold tracking-wider uppercase">SMIT Hackathon</p>
+              </div>
+            </div>
+
+            <nav class="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+              <p class="px-3 text-[10px] font-bold text-indigo-400/40 tracking-widest uppercase mb-2">Operations</p>
+              
+              <button onClick={() => setActiveTab('dashboard')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'dashboard' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                Dashboard
+              </button>
+
+              <button onClick={() => setActiveTab('assets')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'assets' || activeTab === 'asset-details' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="package" class="w-4 h-4"></i>
+                Assets Inventory
+              </button>
+
+              <button onClick={() => setActiveTab('issues')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'issues' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                Issues Desk
+                {stats.activeIssues > 0 && (
+                  <span class="ml-auto bg-amber-500 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-md shadow-amber-500/20">
+                    {stats.activeIssues}
+                  </span>
+                )}
+              </button>
+
+              <button onClick={() => setActiveTab('maintenance')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'maintenance' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                Maintenance Logs
+              </button>
+
+              <button onClick={() => setActiveTab('technician')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'technician' ? 'bg-cyan-600/15 border border-cyan-500/30 text-cyan-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="hard-hat" class="w-4 h-4"></i>
+                Technician Panel
+                {issues.filter(i => !['Resolved','Closed'].includes(i.status) && i.technician_id !== null).length > 0 && (
+                  <span class="ml-auto bg-cyan-500 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-md shadow-cyan-500/20">
+                    {issues.filter(i => !['Resolved','Closed'].includes(i.status) && i.technician_id !== null).length}
+                  </span>
+                )}
+              </button>
+
+              <button onClick={() => setActiveTab('qr')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'qr' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+              }`}>
+                <i data-lucide="qr-code" class="w-4 h-4"></i>
+                QR Label Sheets
+              </button>
+
+              <div class="pt-4">
+                <p class="px-3 text-[10px] font-bold text-indigo-400/40 tracking-widest uppercase mb-2">Diagnostics</p>
+                <button onClick={() => setActiveTab('analytics')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'analytics' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+                  Data Analytics
+                </button>
+                <button onClick={() => setActiveTab('history')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'history' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="history" class="w-4 h-4"></i>
+                  Audit Ledger
+                </button>
+              </div>
+
+              <div class="pt-4">
+                <p class="px-3 text-[10px] font-bold text-indigo-400/40 tracking-widest uppercase mb-2">Management</p>
+                <button onClick={() => setActiveTab('users')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'users' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="users" class="w-4 h-4"></i>
+                  Team Permissions
+                </button>
+                <button onClick={() => setActiveTab('settings')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeTab === 'settings' ? 'bg-indigo-600/15 border border-indigo-500/30 text-indigo-400 font-semibold' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                }`}>
+                  <i data-lucide="sliders" class="w-4 h-4"></i>
+                  System Settings
+                </button>
+              </div>
+            </nav>
+
+            <div class="p-4 border-t border-slate-850 bg-slate-950/40 flex flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+                  activeRole === 'Supervisor' ? 'bg-amber-500/15 text-amber-400' : 'bg-indigo-500/15 text-indigo-400'
+                }`}>
+                  {activeRole[0]}
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">Jameson V.</div>
+                  <div class="text-[10px] text-slate-500 font-semibold">{activeRole} Level</div>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-400">
+                <button onClick={resetAllData} class="py-1 px-2 border border-slate-800 rounded-lg bg-[#060814] hover:bg-red-950/20 hover:border-red-900/30 hover:text-red-400 transition-colors">
+                  Reset DB
+                </button>
+                <button onClick={() => setActiveTab('preview-public')} class="py-1 px-2 border border-indigo-500/20 rounded-lg bg-indigo-950/20 text-indigo-400 hover:bg-indigo-950/40 transition-colors">
+                  Scanner
+                </button>
+              </div>
+            </div>
+          </aside>
+          )}
+
+          {/* MAIN PAGE AREA */}
+          <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-brand-darkBg relative">
+            <header class={`h-16 backdrop-blur-md px-8 flex items-center justify-between shrink-0 z-30 m-4 mb-0 rounded-2xl shadow-xl shadow-[#03050a]/40 border ${
+              isTechRole ? 'bg-[#060f1a]/90 border-cyan-500/15'
+              : isSupervisorRole ? 'bg-[#100a02]/90 border-amber-500/15'
+              : 'bg-[#0c1020]/80 border-indigo-500/10'
+            }`}>
+              <div class="flex items-center gap-3">
+                {isTechRole ? (
+                  <span class="text-xs font-semibold text-cyan-400 uppercase tracking-widest bg-cyan-950/50 px-3 py-1 rounded-full border border-cyan-900/40 flex items-center gap-2">
+                    <i data-lucide="hard-hat" class="w-3 h-3"></i>
+                    Technician Workspace
+                  </span>
+                ) : isSupervisorRole ? (
+                  <span class="text-xs font-semibold text-amber-400 uppercase tracking-widest bg-amber-950/50 px-3 py-1 rounded-full border border-amber-900/40 flex items-center gap-2">
+                    <i data-lucide="clipboard-check" class="w-3 h-3"></i>
+                    Supervisor Command Center
+                  </span>
+                ) : (
+                  <span class="text-xs font-semibold text-indigo-400 uppercase tracking-widest bg-indigo-950/50 px-3 py-1 rounded-full border border-indigo-900/40">
+                    Active view: {activeTab.replace(/-/g, ' ')}
+                  </span>
+                )}
+              </div>
+
+              <div class="flex items-center gap-4">
+                <div class="relative w-64">
+                  <i data-lucide="search" class={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isTechRole ? 'text-cyan-400/50' : isSupervisorRole ? 'text-amber-400/50' : 'text-indigo-400/50'}`}></i>
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    class={`w-full bg-[#060814] rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-all border ${
+                      isTechRole ? 'border-cyan-500/10 focus:border-cyan-500 placeholder-cyan-400/30'
+                      : isSupervisorRole ? 'border-amber-500/10 focus:border-amber-500 placeholder-amber-400/30'
+                      : 'border-indigo-500/10 focus:border-indigo-500 focus:bg-[#090d19] placeholder-indigo-400/30'
+                    }`}
+                  />
+                </div>
+
+                <div class="w-px h-5 bg-slate-700/40"></div>
+
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role:</span>
+                  <select
+                    value={activeRole}
+                    onChange={e => {
+                      setActiveRole(e.target.value);
+                      notify(`Switched to ${e.target.value} portal`, 'success');
+                    }}
+                    class={`border rounded-lg text-xs px-2 py-1 focus:outline-none transition-all bg-[#060814] ${
+                      isTechRole ? 'border-cyan-500/20 text-cyan-300 focus:border-cyan-500'
+                      : isSupervisorRole ? 'border-amber-500/20 text-amber-300 focus:border-amber-500'
+                      : 'border-indigo-500/10 text-slate-300 focus:border-indigo-500'
+                    }`}
+                  >
+                    <option value="Admin">👑 Admin</option>
+                    <option value="Technician">🔧 Technician</option>
+                    <option value="Supervisor">📋 Supervisor</option>
+                  </select>
+                </div>
+              </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-8 relative">
+              <PageComponent
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                assets={assets}
+                setAssets={setAssets}
+                issues={issues}
+                setIssues={setIssues}
+                maintenance={maintenance}
+                setMaintenance={setMaintenance}
+                logs={logs}
+                setLogs={setLogsState}
+                users={users}
+                setUsers={setUsers}
+                stats={stats}
+                searchQuery={searchQuery}
+                inspectedAsset={inspectedAsset}
+                setInspectedAsset={setInspectedAsset}
+                addSystemLog={addSystemLog}
+                activeRole={activeRole}
+                handleInspectAsset={handleInspectAsset}
+              />
+            </main>
+          </div>
+        </div>
+      );
+    }
+  </script>
+
+  <!-- React mounting loader -->
+  <script type="text/babel">
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+  </script>
+
+</body>
+</html>

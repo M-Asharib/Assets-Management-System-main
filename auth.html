@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MaintainIQ — Sign In</title>
+  <meta name="description" content="Sign in or create your MaintainIQ account to access the AI-powered asset management platform." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:     #03050d;
+      --bg-panel:    #080c1a;
+      --bg-card:     #0d1326;
+      --bg-input:    #060814;
+      --border:      rgba(99, 102, 241, 0.15);
+      --border-glow: rgba(99, 102, 241, 0.4);
+      --indigo:      #6366f1;
+      --indigo-light:#818cf8;
+      --cyan:        #06b6d4;
+      --amber:       #f59e0b;
+      --red:         #ef4444;
+      --emerald:     #10b981;
+      --text-main:   #e2e8f0;
+      --text-dim:    #64748b;
+      --text-bright: #ffffff;
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-main); overflow: hidden; }
+
+    /* ── Animated Mesh Background ── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(99,102,241,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(6,182,212,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(99,102,241,0.05) 0%, transparent 70%);
+    }
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0;
+      background-image: linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* ── Floating Orbs ── */
+    .orb {
+      position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0;
+      animation: float 8s ease-in-out infinite;
+    }
+    .orb-1 { width: 400px; height: 400px; background: rgba(99,102,241,0.1); top: -100px; left: -100px; animation-delay: 0s; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(6,182,212,0.07); bottom: -80px; right: -80px; animation-delay: -3s; }
+    .orb-3 { width: 200px; height: 200px; background: rgba(245,158,11,0.06); top: 50%; left: 60%; animation-delay: -5s; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0,0) scale(1); }
+      33%       { transform: translate(20px,-20px) scale(1.05); }
+      66%       { transform: translate(-10px,15px) scale(0.97); }
+    }
+
+    /* ── Layout ── */
+    .page { position: relative; z-index: 1; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+    /* ── Logo Strip ── */
+    .logo-strip { text-align: center; margin-bottom: 28px; }
+    .logo-icon {
+      width: 52px; height: 52px; background: linear-gradient(135deg, var(--indigo), var(--cyan));
+      border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 26px; box-shadow: 0 0 30px rgba(99,102,241,0.3); margin-bottom: 12px;
+      animation: logoGlow 3s ease-in-out infinite;
+    }
+    @keyframes logoGlow {
+      0%,100% { box-shadow: 0 0 20px rgba(99,102,241,0.3); }
+      50%      { box-shadow: 0 0 40px rgba(99,102,241,0.5), 0 0 60px rgba(6,182,212,0.2); }
+    }
+    .logo-name { font-size: 22px; font-weight: 800; background: linear-gradient(90deg, #818cf8, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.5px; }
+    .logo-tagline { font-size: 11px; color: var(--text-dim); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+
+    /* ── Card ── */
+    .card {
+      width: 100%; max-width: 440px;
+      background: rgba(13,19,38,0.7);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 36px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(99,102,241,0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      animation: slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(40px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex; background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: 14px; padding: 4px; margin-bottom: 28px; gap: 4px;
+    }
+    .tab-btn {
+      flex: 1; padding: 9px 0; border: none; border-radius: 10px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.25s ease; color: var(--text-dim); background: transparent;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--indigo), #4f46e5);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    }
+
+    /* ── Form ── */
+    .form-section { display: none; animation: fadeIn 0.3s ease both; }
+    .form-section.visible { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block; font-size: 10px; font-weight: 700; color: rgba(99,102,241,0.7);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+    }
+    .field-wrap { position: relative; }
+    .field-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-dim); pointer-events: none; }
+    .field input, .field select {
+      width: 100%; padding: 12px 14px 12px 42px;
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px;
+      font-size: 13px; color: var(--text-main); font-family: 'Inter', sans-serif;
+      outline: none; transition: all 0.2s ease; appearance: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--border-glow); background: #090d1a;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    }
+    .field input::placeholder { color: var(--text-dim); font-size: 12px; }
+    .field select { cursor: pointer; }
+    .field select option { background: #0d1326; }
+
+    /* Role Picker */
+    .role-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 6px; }
+    .role-card {
+      padding: 12px 8px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--bg-input); cursor: pointer; text-align: center;
+      transition: all 0.2s ease; user-select: none;
+    }
+    .role-card:hover { border-color: rgba(99,102,241,0.3); background: #0a0f1f; }
+    .role-card.selected { border-color: var(--indigo); background: rgba(99,102,241,0.1); box-shadow: 0 0 0 1px rgba(99,102,241,0.2) inset; }
+    .role-card.selected-super { border-color: var(--amber); background: rgba(245,158,11,0.08); }
+    .role-card.selected-tech  { border-color: var(--cyan);  background: rgba(6,182,212,0.08); }
+    .role-icon { font-size: 20px; margin-bottom: 4px; }
+    .role-label { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .role-card.selected .role-label { color: var(--indigo-light); }
+    .role-card.selected-super .role-label { color: var(--amber); }
+    .role-card.selected-tech  .role-label { color: var(--cyan); }
+
+    /* Password toggle */
+    .eye-btn {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 16px;
+      transition: color 0.2s; padding: 0;
+    }
+    .eye-btn:hover { color: var(--indigo-light); }
+    .field input.has-eye { padding-right: 40px; }
+
+    /* Strength meter */
+    .strength-bar { display: flex; gap: 4px; margin-top: 6px; }
+    .strength-seg { flex: 1; height: 3px; border-radius: 99px; background: rgba(99,102,241,0.1); transition: background 0.3s; }
+    .strength-seg.weak   { background: var(--red); }
+    .strength-seg.fair   { background: var(--amber); }
+    .strength-seg.good   { background: var(--indigo); }
+    .strength-seg.strong { background: var(--emerald); }
+    .strength-text { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+    /* Submit Button */
+    .btn-submit {
+      width: 100%; padding: 14px; border: none; border-radius: 14px; font-size: 14px;
+      font-weight: 700; color: #fff; cursor: pointer; transition: all 0.3s ease; margin-top: 8px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      box-shadow: 0 8px 24px rgba(99,102,241,0.3);
+      letter-spacing: 0.02em;
+      position: relative; overflow: hidden;
+    }
+    .btn-submit::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      transform: translateX(-100%); transition: transform 0.6s ease;
+    }
+    .btn-submit:hover::after { transform: translateX(100%); }
+    .btn-submit:hover { box-shadow: 0 12px 32px rgba(99,102,241,0.45); transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-submit.loading { pointer-events: none; }
+
+    .btn-submit.role-super { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 8px 24px rgba(245,158,11,0.25); }
+    .btn-submit.role-tech  { background: linear-gradient(135deg, #06b6d4, #0891b2); box-shadow: 0 8px 24px rgba(6,182,212,0.25); }
+
+    /* Error / Success Toast */
+    .alert { padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-bottom: 16px; display: none; align-items: center; gap: 8px; }
+    .alert.show { display: flex; animation: alertPop 0.3s ease; }
+    .alert.error   { background: rgba(239,68,68,0.1);   border: 1px solid rgba(239,68,68,0.25);   color: #fca5a5; }
+    .alert.success { background: rgba(16,185,129,0.1);  border: 1px solid rgba(16,185,129,0.25);  color: #6ee7b7; }
+    @keyframes alertPop { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+
+    /* Divider */
+    .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .divider span { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+
+    /* Quick Login Pills */
+    .quick-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .quick-pill {
+      padding: 6px 14px; border-radius: 99px; font-size: 10px; font-weight: 700;
+      border: 1px solid; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.06em;
+      background: transparent;
+    }
+    .quick-pill-admin  { border-color: rgba(99,102,241,0.35); color: #818cf8; }
+    .quick-pill-admin:hover  { background: rgba(99,102,241,0.12); }
+    .quick-pill-tech   { border-color: rgba(6,182,212,0.35);   color: #22d3ee; }
+    .quick-pill-tech:hover   { background: rgba(6,182,212,0.12); }
+    .quick-pill-super  { border-color: rgba(245,158,11,0.35);  color: #fbbf24; }
+    .quick-pill-super:hover  { background: rgba(245,158,11,0.12); }
+
+    .hint-text { font-size: 10px; color: var(--text-dim); text-align: center; margin-top: 20px; }
+    .hint-text a { color: var(--indigo-light); text-decoration: none; }
+
+    /* Spinner */
+    .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Backend status badge */
+    .db-badge {
+      position: fixed; top: 16px; right: 16px; z-index: 100;
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 99px; font-size: 10px; font-weight: 700;
+      border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase;
+      backdrop-filter: blur(10px);
+    }
+    .db-badge.online  { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.25); color: #6ee7b7; }
+    .db-badge.offline { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: #fbbf24; }
+    .db-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .db-badge.online  .db-dot { background: #10b981; animation: pulse 2s infinite; }
+    .db-badge.offline .db-dot { background: #f59e0b; }
+    @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card { padding: 24px; border-radius: 20px; }
+      .role-grid { grid-template-columns: repeat(3,1fr); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated Background -->
+  <div class="bg-mesh"></div>
+  <div class="bg-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- DB Status Badge -->
+  <div class="db-badge offline" id="dbBadge">
+    <div class="db-dot"></div>
+    <span id="dbStatus">Connecting...</span>
+  </div>
+
+  <div class="page">
+    <div style="width:100%;max-width:440px;">
+      <!-- Logo -->
+      <div class="logo-strip">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-name">MaintainIQ</div>
+        <div class="logo-tagline">AI-Powered Asset Management Platform</div>
+      </div>
+
+      <!-- Card -->
+      <div class="card">
+        <!-- Alert -->
+        <div class="alert" id="alertBox">
+          <span id="alertIcon">⚠</span>
+          <span id="alertText"></span>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+          <button class="tab-btn"        id="tabRegister" onclick="switchTab('register')">Create Account</button>
+        </div>
+
+        <!-- ── LOGIN FORM ── -->
+        <div class="form-section visible" id="sectionLogin">
+          <div class="field">
+            <label>Username</label>
+            <div class="field-wrap">
+              <span class="field-icon">👤</span>
+              <input type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="field-wrap">
+              <span class="field-icon">🔑</span>
+              <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" class="has-eye" />
+              <button class="eye-btn" onclick="togglePwd('loginPassword',this)" type="button">👁️</button>
+            </div>
+          </div>
+
+          <button class="btn-submit" id="btnLogin" onclick="handleLogin()">Sign In to Dashboard</button>
+
+          <div class="divider"><span>or try a demo account</span></div>
+          <div class="quick-pills">
+            <button class="quick-pill quick-pill-admin" onclick="quickFill('admin_jameson','admin123')">🔷 Admin</button>
+            <button class="quick-pill quick-pill-tech"  onclick="quickFill('tech_ali','tech123')">🔧 Technician</button>
+            <button class="quick-pill quick-pill-super" onclick="quickFill('supervisor_bilal','super123')">👁 Supervisor</button>
+          </div>
+        </div>
+
+        <!-- ── REGISTER FORM ── -->
+        <div class="form-section" id="sectionRegister">
+          <div class="field">
+            <label>Full Name</label>
+            <div class="field-wrap">
+              <span class="field-icon">✨</span>
+              <input type="text" id="regFullName" placeholder="e.g. Ali Hassan" autocomplete="name" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Username</label>
+            <div class="field-wrap">
+              <span class="field-icon">👤</span>
+              <input type="text" id="regUsername" placeholder="e.g. tech_ali" autocomplete="username" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="field-wrap">
+              <span class="field-icon">🔑</span>
+              <input type="password" id="regPassword" placeholder="Minimum 6 characters" class="has-eye" oninput="checkStrength(this.value)" autocomplete="new-password" />
+              <button class="eye-btn" onclick="togglePwd('regPassword',this)" type="button">👁️</button>
+            </div>
+            <div class="strength-bar" id="strengthBar">
+              <div class="strength-seg" id="s1"></div>
+              <div class="strength-seg" id="s2"></div>
+              <div class="strength-seg" id="s3"></div>
+              <div class="strength-seg" id="s4"></div>
+            </div>
+            <div class="strength-text" id="strengthText"></div>
+          </div>
+          <div class="field">
+            <label>Select Your Role</label>
+            <div class="role-grid">
+              <div class="role-card selected" id="role-Admin" onclick="selectRole('Admin')">
+                <div class="role-icon">🔷</div>
+                <div class="role-label">Admin</div>
+              </div>
+              <div class="role-card" id="role-Technician" onclick="selectRole('Technician')">
+                <div class="role-icon">🔧</div>
+                <div class="role-label">Technician</div>
+              </div>
+              <div class="role-card" id="role-Supervisor" onclick="selectRole('Supervisor')">
+                <div class="role-icon">👁</div>
+                <div class="role-label">Supervisor</div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-submit" id="btnRegister" onclick="handleRegister()">Create Account</button>
+        </div>
+
+        <p class="hint-text">By continuing, you agree to the <a href="#">MaintainIQ Terms of Service</a>.<br/>All sessions are secured with JWT encryption.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = (window.location.port === '5000' || window.location.port === '3000')
+      ? '' : 'http://localhost:5000';
+
+    let selectedRole = 'Admin';
+
+    // ── Check backend health ──────────────────────────────────────────────────
+    async function checkBackend() {
+      try {
+        const r = await fetch(`${API}/api/health`);
+        if (r.ok) {
+          const d = await r.json();
+          const badge = document.getElementById('dbBadge');
+          const status = document.getElementById('dbStatus');
+          if (d.database === 'connected') {
+            badge.className = 'db-badge online';
+            status.textContent = 'MongoDB Connected';
+          } else {
+            badge.className = 'db-badge offline';
+            status.textContent = 'DB Disconnected';
+          }
+        }
+      } catch {
+        document.getElementById('dbBadge').className = 'db-badge offline';
+        document.getElementById('dbStatus').textContent = 'Backend Offline';
+      }
+    }
+    checkBackend();
+    setInterval(checkBackend, 10000);
+
+    // ── If already logged in, redirect ───────────────────────────────────────
+    (function() {
+      const saved = localStorage.getItem('maintainiq_auth');
+      if (saved) {
+        try {
+          const { token, user } = JSON.parse(saved);
+          if (token && user) {
+            window.location.replace('./admin/index.html');
+          }
+        } catch {}
+      }
+    })();
+
+    // ── Tab switch ────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.getElementById('sectionLogin').classList.toggle('visible', tab === 'login');
+      document.getElementById('sectionRegister').classList.toggle('visible', tab === 'register');
+      document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+      document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+      hideAlert();
+    }
+
+    // ── Role selector ─────────────────────────────────────────────────────────
+    function selectRole(role) {
+      selectedRole = role;
+      ['Admin','Technician','Supervisor'].forEach(r => {
+        const card = document.getElementById(`role-${r}`);
+        card.className = 'role-card';
+        if (r === role) {
+          if (r === 'Admin')      card.classList.add('selected');
+          if (r === 'Technician') card.classList.add('selected-tech');
+          if (r === 'Supervisor') card.classList.add('selected-super');
+        }
+      });
+      // Update button color
+      const btn = document.getElementById('btnRegister');
+      btn.className = 'btn-submit';
+      if (role === 'Supervisor') btn.classList.add('role-super');
+      if (role === 'Technician') btn.classList.add('role-tech');
+    }
+
+    // ── Password toggle ───────────────────────────────────────────────────────
+    function togglePwd(id, btn) {
+      const inp = document.getElementById(id);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁️' : '🙈';
+    }
+
+    // ── Strength meter ────────────────────────────────────────────────────────
+    function checkStrength(val) {
+      const segs = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3'), document.getElementById('s4')];
+      segs.forEach(s => s.className = 'strength-seg');
+      const txt = document.getElementById('strengthText');
+      if (!val) { txt.textContent = ''; return; }
+      let score = 0;
+      if (val.length >= 6) score++;
+      if (val.length >= 10) score++;
+      if (/[A-Z]/.test(val) && /[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+      const labels = ['','Weak','Fair','Good','Strong'];
+      const cls    = ['','weak','fair','good','strong'];
+      for (let i = 0; i < score; i++) segs[i].classList.add(cls[score]);
+      txt.textContent = score ? `Password strength: ${labels[score]}` : '';
+    }
+
+    // ── Quick fill (demo accounts) ────────────────────────────────────────────
+    function quickFill(user, pass) {
+      document.getElementById('loginUsername').value = user;
+      document.getElementById('loginPassword').value = pass;
+      switchTab('login');
+    }
+
+    // ── Alert helpers ─────────────────────────────────────────────────────────
+    function showAlert(msg, type = 'error') {
+      const box = document.getElementById('alertBox');
+      document.getElementById('alertIcon').textContent = type === 'success' ? '✅' : '⚠️';
+      document.getElementById('alertText').textContent = msg;
+      box.className = `alert show ${type}`;
+    }
+    function hideAlert() { document.getElementById('alertBox').classList.remove('show'); }
+
+    // ── Set loading state ─────────────────────────────────────────────────────
+    function setLoading(btnId, loading, label) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.innerHTML = loading ? `<span class="spinner"></span> ${label}...` : label;
+    }
+
+    // ── After successful auth → store and redirect ────────────────────────────
+    function onAuthSuccess({ token, user }) {
+      localStorage.setItem('maintainiq_auth', JSON.stringify({ token, user }));
+      localStorage.setItem('maintainiq_active_role', user.role);
+      showAlert(`Welcome, ${user.full_name || user.username}! Redirecting...`, 'success');
+      setTimeout(() => { window.location.replace('./admin/index.html'); }, 900);
+    }
+
+    // ── Local fallback auth (when backend/MongoDB is offline) ─────────────────
+    function localFallbackLogin(username, password) {
+      const demos = [
+        { username: 'admin_jameson',    password: 'admin123',  full_name: 'James Admin',      role: 'Admin'      },
+        { username: 'tech_ali',         password: 'tech123',   full_name: 'Ali Technician',   role: 'Technician' },
+        { username: 'tech_zara',        password: 'tech123',   full_name: 'Zara Engineer',    role: 'Technician' },
+        { username: 'supervisor_bilal', password: 'super123',  full_name: 'Bilal Supervisor', role: 'Supervisor' },
+      ];
+      const match = demos.find(d => d.username === username && d.password === password);
+      if (!match) return null;
+      const fakeToken = btoa(JSON.stringify({ id: match.username, username: match.username, role: match.role }));
+      return { token: fakeToken, user: { id: match.username, username: match.username, full_name: match.full_name, role: match.role } };
+    }
+
+    // ── LOGIN ─────────────────────────────────────────────────────────────────
+    async function handleLogin() {
+      hideAlert();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) { showAlert('Please enter your username and password.'); return; }
+
+      setLoading('btnLogin', true, 'Signing In');
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed.');
+        onAuthSuccess(data);
+      } catch (err) {
+        // Try local fallback
+        if (err.message.includes('fetch') || err.message.includes('Failed')) {
+          const fallback = localFallbackLogin(username, password);
+          if (fallback) { onAuthSuccess(fallback); return; }
+          showAlert('Backend is offline. Use a demo account pill below.');
+        } else {
+          showAlert(err.message);
+        }
+        setLoading('btnLogin', false, 'Sign In to Dashboard');
+      }
+    }
+
+    // ── REGISTER ──────────────────────────────────────────────────────────────
+    async function handleRegister() {
+      hideAlert();
+      const full_name = document.getElementById('regFullName').value.trim();
+      const username  = document.getElementById('regUsername').value.trim();
+      const password  = document.getElementById('regPassword').value;
+      const role      = selectedRole;
+
+      if (!username || !password) { showAlert('Username and password are required.'); return; }
+      if (password.length < 6)    { showAlert('Password must be at least 6 characters.'); return; }
+
+      setLoading('btnRegister', true, 'Creating Account');
+      try {
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, full_name: full_name || username, role })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed.');
+        onAuthSuccess(data);
+      } catch (err) {
+        if (err.message.includes('fetch') || err.message.includes('Failed')) {
+          // Local fallback registration
+          const fakeToken = btoa(JSON.stringify({ id: username, username, role }));
+          const user = { id: username, username, full_name: full_name || username, role };
+          onAuthSuccess({ token: fakeToken, user });
+        } else {
+          showAlert(err.message);
+          setLoading('btnRegister', false, 'Create Account');
+        }
+      }
+    }
+
+    // Enter key submit
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('sectionLogin').classList.contains('visible')) handleLogin();
+        else handleRegister();
+      }
+    });
+  </script>
+</body>
+</html>
