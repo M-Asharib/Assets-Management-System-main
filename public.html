@@ -59,8 +59,9 @@
   </div>
 
   <script>
-    const API = (window.location.port === '5000' || window.location.port === '3000')
-      ? '' : 'http://localhost:5000';
+    // Same-origin by default (the Express server serves this file and the API together).
+    // Only the legacy dev port 8000 (old FastAPI scaffold) needs a different host.
+    const API = window.location.port === '8000' ? 'http://localhost:5000' : '';
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const content = document.getElementById('content');
