@@ -108,3 +108,5 @@ See [API.md](./API.md) for the full endpoint reference.
 
 ## 🛡️ Fail-Safe Local Fallback Mode
 MaintainIQ features a built-in **resilient fallback layer**. If your MongoDB server or backend is offline, the client detects the offline status and seamlessly switches to LocalStorage-based datasets. This allows testing all tabs (Admin, Tech, Supervisor) without requiring MongoDB to be active.
+
+<!-- CI/CD deploy pipeline test 2026-07-12T01:06:32Z -->
