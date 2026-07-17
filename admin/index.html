@@ -28,7 +28,7 @@
         const { token, user } = JSON.parse(saved);
         if (!token || !user) { window.location.replace('../auth.html'); return; }
         if (user.role === 'Technician') { window.location.replace('../technician/index.html'); return; }
-        if (user.role === 'Supervisor') { window.location.replace('../supervisor/index.html'); return; }
+        if (user.role === 'Supervisor') { window.location.replace('../supervisor/dashboard.html'); return; }
         // Expose globally for React App to consume
         window.__AUTH_USER__  = user;
         window.__AUTH_TOKEN__ = token;
