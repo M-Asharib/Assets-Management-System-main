@@ -2463,6 +2463,22 @@
       }, [activeTab]);
 
       const renderTabContent = () => {
+        const isTech = activeRole === 'Technician';
+        const isSuper = activeRole === 'Supervisor';
+
+        if (isTech) {
+          // Technicians only have access to 'technician' and 'preview-public'
+          if (activeTab !== 'technician' && activeTab !== 'preview-public') {
+            return <TechnicianPage issues={issues} setIssues={setIssues} maintenance={maintenance} setMaintenance={setMaintenance} assets={assets} users={users} activeRole={activeRole} addSystemLog={addSystemLog} searchQuery={searchQuery} />;
+          }
+        } else if (isSuper) {
+          // Supervisors have access to supervisor, issues, maintenance, assets, asset-details, analytics, history, preview-public
+          const allowed = ['supervisor', 'issues', 'maintenance', 'assets', 'asset-details', 'analytics', 'history', 'preview-public'];
+          if (!allowed.includes(activeTab)) {
+            return <SupervisorPage issues={issues} setIssues={setIssues} maintenance={maintenance} assets={assets} users={users} logs={logs} addSystemLog={addSystemLog} />;
+          }
+        }
+
         switch (activeTab) {
           case 'dashboard':
             return <DashboardPage stats={stats} logs={logs} assets={assets} setActiveTab={setActiveTab} />;

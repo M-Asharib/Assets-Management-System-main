@@ -36,6 +36,15 @@ mongoose.connect(MONGO_URI)
     console.log('Ensure MongoDB service is running locally, or verify your MONGO_URI.');
   });
 
+// Database connection check middleware for API endpoints
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Database is disconnected. Please use local sandbox/demo fallback.' });
+  }
+  next();
+});
+
 // API Routes
 app.use('/api/auth',        require('./routes/auth'));
 app.use('/api/assets',      require('./routes/assets'));

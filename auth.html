@@ -530,12 +530,22 @@
         if (!res.ok) throw new Error(data.error || 'Login failed.');
         onAuthSuccess(data);
       } catch (err) {
-        // Try local fallback
-        if (err.message.includes('fetch') || err.message.includes('Failed')) {
+        // Try local fallback if it's a network error, database disconnected, or timeout error
+        const isDbOrNetworkError = err.message.includes('fetch') || 
+                                   err.message.includes('Failed') || 
+                                   err.message.includes('disconnected') || 
+                                   err.message.includes('timeout') || 
+                                   err.message.includes('buffering') || 
+                                   err.message.includes('503') ||
+                                   err.message.includes('database');
+        if (isDbOrNetworkError) {
           const fallback = localFallbackLogin(username, password);
           if (fallback) { onAuthSuccess(fallback); return; }
-          showAlert('Backend is offline. Use a demo account pill below.');
+          showAlert('Backend database is offline/disconnected. Use a demo account pill below.');
         } else {
+          // If it's any other error but credentials match a demo account, fallback
+          const fallback = localFallbackLogin(username, password);
+          if (fallback) { onAuthSuccess(fallback); return; }
           showAlert(err.message);
         }
         setLoading('btnLogin', false, 'Sign In to Dashboard');
