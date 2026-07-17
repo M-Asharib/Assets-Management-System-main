@@ -2586,8 +2586,16 @@
           setLogsState(dataL);
 
           const resU = await apiFetch('/api/users');
-          const dataU = await resU.json();
-          setUsersState(dataU);
+          if (resU.ok) {
+            const dataU = await resU.json();
+            setUsersState(dataU);
+          } else {
+            const resTechs = await apiFetch('/api/technicians');
+            if (resTechs.ok) {
+              const dataTechs = await resTechs.json();
+              setUsersState(dataTechs);
+            }
+          }
 
           setIsBackendConnected(true);
         } catch (e) {
