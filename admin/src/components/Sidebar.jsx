@@ -34,6 +34,12 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar({ active, onNav, issueCount = 0 }) {
+  const handleLogout = () => {
+    localStorage.removeItem('maintainiq_auth')
+    localStorage.removeItem('maintainiq_active_role')
+    window.location.replace('../auth.html')
+  }
+
   return (
     <aside className="sidebar">
       {/* Logo */}
@@ -91,7 +97,7 @@ export default function Sidebar({ active, onNav, issueCount = 0 }) {
           <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>Administrator</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>admin@maintainiq.io</div>
         </div>
-        <button className="btn-icon" style={{ marginLeft: 'auto', padding: 5 }}>
+        <button onClick={handleLogout} className="btn-icon" style={{ marginLeft: 'auto', padding: 5 }} title="Log out">
           <Icon name="logout" size={16} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
