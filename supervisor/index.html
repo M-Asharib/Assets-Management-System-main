@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MaintainIQ — Enterprise Administrator Portal</title>
+  <title>MaintainIQ — Supervisor Command Center</title>
   <meta name="description" content="AI-Powered QR Maintenance & Asset History Platform">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,7 +18,7 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+ 
   <script>
     // ── AUTH GUARD: Redirect to login if no valid session ──────────────────
     (function() {
@@ -27,8 +27,7 @@
       try {
         const { token, user } = JSON.parse(saved);
         if (!token || !user) { window.location.replace('../auth.html'); return; }
-        if (user.role === 'Technician') { window.location.replace('../technician/index.html'); return; }
-        if (user.role === 'Supervisor') { window.location.replace('../supervisor/index.html'); return; }
+        if (user.role !== 'Supervisor') { window.location.replace('../admin/index.html'); return; }
         // Expose globally for React App to consume
         window.__AUTH_USER__  = user;
         window.__AUTH_TOKEN__ = token;
