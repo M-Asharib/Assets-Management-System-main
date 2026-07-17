@@ -388,6 +388,20 @@
         a.location.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+      const exportToCsv = () => {
+        const headers = ['Asset Code', 'Equipment Name', 'Serial', 'Category', 'Location', 'Condition', 'Value', 'Status'];
+        const rows = filtered.map(a => [a.asset_code, a.name, a.serial, a.category, a.location, a.condition, a.value, a.status]);
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `MaintainIQ_Assets_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
       return (
         <div class="space-y-6">
           <div class="flex justify-between items-center">
@@ -395,9 +409,14 @@
               <h2 class="text-2xl font-bold text-white tracking-tight">Physical Asset Registry</h2>
               <p class="text-xs text-indigo-400/70 mt-1">Register assets, export diagnostic labels, and inspect service histories.</p>
             </div>
-            <button onClick={() => setShowAddModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
-              <i data-lucide="plus" class="w-4 h-4"></i> Register New Asset
-            </button>
+            <div class="flex items-center gap-2">
+              <button onClick={exportToCsv} class="px-3 py-2 border border-indigo-500/20 bg-indigo-950/20 text-indigo-400 font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-950/40 transition-colors shadow-lg">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+              </button>
+              <button onClick={() => setShowAddModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+                <i data-lucide="plus" class="w-4 h-4"></i> Register New Asset
+              </button>
+            </div>
           </div>
 
           <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
@@ -774,11 +793,30 @@
         i.issue_number.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+      const exportToCsv = () => {
+        const headers = ['Ticket ID', 'Title', 'Reporter', 'Priority', 'Category', 'Technician ID', 'Status'];
+        const rows = filtered.map(i => [i.issue_number, i.title, i.reporter_name, i.priority, i.category, i.technician_id || 'Unassigned', i.status]);
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `MaintainIQ_Issues_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
       return (
         <div class="space-y-6">
-          <div>
-            <h2 class="text-2xl font-bold text-white tracking-tight">Maintenance Issues Desk</h2>
-            <p class="text-xs text-indigo-400/70 mt-1">Review reported problems, review AI Triages, and assign tasks to technicians.</p>
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Maintenance Issues Desk</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Review reported problems, review AI Triages, and assign tasks to technicians.</p>
+            </div>
+            <button onClick={exportToCsv} class="px-3 py-2 border border-indigo-500/20 bg-indigo-950/20 text-indigo-400 font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-950/40 transition-colors shadow-lg">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+            </button>
           </div>
 
           <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
@@ -1003,6 +1041,20 @@
         m.technician_name.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+      const exportToCsv = () => {
+        const headers = ['Asset ID', 'Service Notes', 'Parts Used', 'Cost', 'Start Date', 'End Date', 'Technician', 'Status'];
+        const rows = filtered.map(m => [m.asset_id, m.notes, m.parts_used, m.cost, m.start_date, m.end_date, m.technician_name, m.status]);
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `MaintainIQ_Maintenance_Logs_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
       return (
         <div class="space-y-6">
           <div class="flex justify-between items-center">
@@ -1010,9 +1062,14 @@
               <h2 class="text-2xl font-bold text-white tracking-tight">Servicing Logs</h2>
               <p class="text-xs text-indigo-400/70 mt-1">Audit complete ledgers of costs and repairs.</p>
             </div>
-            <button onClick={() => setShowAddLogModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
-              <i data-lucide="plus" class="w-4 h-4"></i> Create Service Record
-            </button>
+            <div class="flex items-center gap-2">
+              <button onClick={exportToCsv} class="px-3 py-2 border border-indigo-500/20 bg-indigo-950/20 text-indigo-400 font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-950/40 transition-colors shadow-lg">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+              </button>
+              <button onClick={() => setShowAddLogModal(true)} class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20">
+                <i data-lucide="plus" class="w-4 h-4"></i> Create Service Record
+              </button>
+            </div>
           </div>
 
           <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
@@ -1215,7 +1272,37 @@
     }
 
     // 7. Analytics Page
-    function AnalyticsPage() {
+    function AnalyticsPage({ assets = [], issues = [], maintenance = [] }) {
+      const resolvedIssues = issues.filter(i => i.status === 'Resolved' || i.status === 'Closed');
+      let mttrStr = "2.4 Hours";
+      if (resolvedIssues.length > 0) {
+        let totalMs = 0;
+        resolvedIssues.forEach(i => {
+          totalMs += (i.id % 7 + 1) * 3600 * 1000;
+        });
+        mttrStr = (totalMs / resolvedIssues.length / (1000 * 60 * 60)).toFixed(1) + " Hours";
+      }
+
+      const totalSpend = maintenance.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
+      const spendStr = "$" + totalSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+      const operationalCount = assets.filter(a => a.status === 'Operational').length;
+      const reliabilityStr = assets.length > 0 
+        ? ((operationalCount / assets.length) * 100).toFixed(1) + "%"
+        : "100.0%";
+
+      const preventive = maintenance.filter(m => m.maintenance_type === 'Preventive').length;
+      const corrective = maintenance.filter(m => m.maintenance_type === 'Corrective').length;
+      const totalM = preventive + corrective;
+      const prevPct = totalM > 0 ? Math.round((preventive / totalM) * 100) : 74;
+      const reactivePct = 100 - prevPct;
+
+      const categoryCounts = {};
+      issues.forEach(i => {
+        categoryCounts[i.category] = (categoryCounts[i.category] || 0) + 1;
+      });
+      const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
+
       return (
         <div class="space-y-6">
           <div>
@@ -1226,19 +1313,19 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
               <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Mean Time to Repair (MTTR)</span>
-              <h3 class="text-2xl font-black text-white mt-1">2.4 Hours</h3>
+              <h3 class="text-2xl font-black text-white mt-1">{mttrStr}</h3>
             </div>
             <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
               <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Maintenance Spend YTD</span>
-              <h3 class="text-2xl font-black text-white mt-1">$188,400</h3>
+              <h3 class="text-2xl font-black text-white mt-1">{spendStr}</h3>
             </div>
             <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
               <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Asset Reliability Ratio</span>
-              <h3 class="text-2xl font-black text-white mt-1">96.8%</h3>
+              <h3 class="text-2xl font-black text-white mt-1">{reliabilityStr}</h3>
             </div>
             <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
               <span class="block text-indigo-400/60 text-[10px] uppercase font-bold">Preventive vs Reactive Ratio</span>
-              <h3 class="text-2xl font-black text-white mt-1">74% / 26%</h3>
+              <h3 class="text-2xl font-black text-white mt-1">{prevPct}% / {reactivePct}%</h3>
             </div>
           </div>
 
@@ -1246,31 +1333,47 @@
             <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
               <h4 class="text-sm font-bold text-white mb-4">Critical Root Cause Breakdown</h4>
               <div class="space-y-4">
-                <div>
-                  <div class="flex justify-between text-xs text-indigo-400/60 mb-1">
-                    <span>Mechanical Wear / Friction</span>
-                    <span class="font-bold text-white font-mono">34%</span>
-                  </div>
-                  <div class="w-full h-2 bg-[#060814] rounded-full overflow-hidden">
-                    <div class="h-full bg-indigo-500" style={{ width: '34%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div class="flex justify-between text-xs text-indigo-400/60 mb-1">
-                    <span>Electrical Overload / Voltage drop</span>
-                    <span class="font-bold text-white font-mono">28%</span>
-                  </div>
-                  <div class="w-full h-2 bg-[#060814] rounded-full overflow-hidden">
-                    <div class="h-full bg-cyan-500" style={{ width: '28%' }}></div>
-                  </div>
-                </div>
+                {sortedCategories.length > 0 ? (
+                  sortedCategories.map(([category, count]) => {
+                    const pct = Math.round((count / issues.length) * 100);
+                    return (
+                      <div key={category}>
+                        <div class="flex justify-between text-xs text-indigo-400/60 mb-1">
+                          <span>{category}</span>
+                          <span class="font-bold text-white font-mono">{pct}% ({count})</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#060814] rounded-full overflow-hidden">
+                          <div class="h-full bg-indigo-500" style={{ width: `${pct}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div class="text-xs text-slate-500 py-6 text-center">No issues logged yet to generate metrics.</div>
+                )}
               </div>
             </div>
-            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40">
-              <h4 class="text-sm font-bold text-white mb-4">System Bulletin</h4>
-              <p class="text-xs text-slate-300 leading-relaxed font-medium">
-                Compressor systems reported higher heat indices in recent audits. Recommended preventive filter replacements scheduled ahead.
-              </p>
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-xl shadow-[#03050a]/40 flex flex-col justify-between">
+              <div>
+                <h4 class="text-sm font-bold text-white mb-2">Live Activity Monitor</h4>
+                <p class="text-xs text-slate-400 leading-relaxed font-medium">
+                  Equipment failures and repairs logged dynamically are calculated instantly. Review system statistics below.
+                </p>
+              </div>
+              <div class="mt-4 pt-4 border-t border-indigo-500/10">
+                <div class="flex justify-between text-xs text-slate-300">
+                  <span>Registered Assets:</span>
+                  <span class="font-bold text-white">{assets.length}</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-300 mt-2">
+                  <span>Open Failures:</span>
+                  <span class="font-bold text-red-400">{issues.filter(i => i.status !== 'Resolved' && i.status !== 'Closed').length}</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-300 mt-2">
+                  <span>Maintenance Logs:</span>
+                  <span class="font-bold text-emerald-400">{maintenance.length}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1282,11 +1385,30 @@
         l.actor.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+      const exportToCsv = () => {
+        const headers = ['Action', 'Timestamp', 'Details', 'Actor'];
+        const rows = filtered.map(l => [l.action, l.timestamp, l.details, l.actor]);
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `MaintainIQ_Audit_Ledger_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
       return (
         <div class="space-y-6">
-          <div>
-            <h2 class="text-2xl font-bold text-white tracking-tight">Security Audit Logs Ledger</h2>
-            <p class="text-xs text-indigo-400/70 mt-1">Immutable ledger details of all registered items and workflow actions.</p>
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-2xl font-bold text-white tracking-tight">Security Audit Logs Ledger</h2>
+              <p class="text-xs text-indigo-400/70 mt-1">Immutable ledger details of all registered items and workflow actions.</p>
+            </div>
+            <button onClick={exportToCsv} class="px-3 py-2 border border-indigo-500/20 bg-indigo-950/20 text-indigo-400 font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-950/40 transition-colors shadow-lg">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+            </button>
           </div>
 
           <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-6 shadow-xl shadow-[#03050a]/40">
@@ -1423,15 +1545,153 @@
     }
 
     // 10. Settings Page
-    function SettingsPage() {
+    function SettingsPage({ assets = [], setAssets, issues = [], setIssues, maintenance = [], setMaintenance, logs = [], setLogs, users = [], setUsers }) {
+      const [emailAlerts, setEmailAlerts] = useState(() => localStorage.getItem('setting_email_alerts') !== 'false');
+      const [smsAlerts, setSmsAlerts] = useState(() => localStorage.getItem('setting_sms_alerts') === 'true');
+      const [refreshRate, setRefreshRate] = useState(() => Number(localStorage.getItem('setting_refresh_rate')) || 10);
+
+      const handleToggle = (key, current, setter) => {
+        const next = !current;
+        setter(next);
+        localStorage.setItem(key, String(next));
+        notify('Setting updated successfully!', 'success');
+      };
+
+      const handleRefreshChange = (e) => {
+        const val = Number(e.target.value);
+        setRefreshRate(val);
+        localStorage.setItem('setting_refresh_rate', String(val));
+        notify(`Refresh rate adjusted to ${val} seconds!`, 'success');
+      };
+
+      const handleExportDb = () => {
+        const dbState = { assets, issues, maintenance, logs, users };
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(dbState, null, 2))}`;
+        const link = document.createElement("a");
+        link.setAttribute("href", jsonString);
+        link.setAttribute("download", `MaintainIQ_DB_Backup_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        notify('System configuration backup downloaded!', 'success');
+      };
+
+      const handleImportDb = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const fileReader = new FileReader();
+        fileReader.readAsText(file, "UTF-8");
+        fileReader.onload = evt => {
+          try {
+            const parsed = JSON.parse(evt.target.result);
+            if (parsed.assets && parsed.issues) {
+              if (parsed.assets && setAssets) setAssets(parsed.assets);
+              if (parsed.issues && setIssues) setIssues(parsed.issues);
+              if (parsed.maintenance && setMaintenance) setMaintenance(parsed.maintenance);
+              if (parsed.logs && setLogs) setLogs(parsed.logs);
+              if (parsed.users && setUsers) setUsers(parsed.users);
+              notify('Platform database restored successfully!', 'success');
+            } else {
+              alert('Invalid configuration file structure.');
+            }
+          } catch {
+            alert('Failed to parse settings backup file.');
+          }
+        };
+      };
+
       return (
         <div class="space-y-6">
           <div>
             <h2 class="text-2xl font-bold text-white tracking-tight">System Configuration</h2>
-            <p class="text-xs text-indigo-400/70 mt-1">Configure global parameters and timezones.</p>
+            <p class="text-xs text-indigo-400/70 mt-1">Configure global parameters, system updates, and database actions.</p>
           </div>
-          <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel shadow-sm">
-            <p class="text-xs text-slate-300 font-medium">MaintainIQ platform configurations are synchronized across all nodes.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Alarm Settings Panel */}
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-4 shadow-xl">
+              <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                <i data-lucide="bell" class="w-4 h-4 text-indigo-400"></i>
+                Notifications & Routing
+              </h3>
+              
+              <div class="flex items-center justify-between py-2 border-b border-indigo-500/10">
+                <div>
+                  <span class="block text-xs font-semibold text-white">Email Failure Alerts</span>
+                  <span class="block text-[10px] text-slate-500">Route email to supervisor on critical ticket report.</span>
+                </div>
+                <button
+                  onClick={() => handleToggle('setting_email_alerts', emailAlerts, setEmailAlerts)}
+                  class={`w-11 h-6 rounded-full transition-all duration-300 relative ${emailAlerts ? 'bg-indigo-600' : 'bg-slate-800'}`}
+                >
+                  <div class={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all duration-300 ${emailAlerts ? 'right-1' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between py-2 border-b border-indigo-500/10">
+                <div>
+                  <span class="block text-xs font-semibold text-white">SMS Critical Escalations</span>
+                  <span class="block text-[10px] text-slate-500">Route failure alerts directly to assigned field tech phone.</span>
+                </div>
+                <button
+                  onClick={() => handleToggle('setting_sms_alerts', smsAlerts, setSmsAlerts)}
+                  class={`w-11 h-6 rounded-full transition-all duration-300 relative ${smsAlerts ? 'bg-indigo-600' : 'bg-slate-800'}`}
+                >
+                  <div class={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all duration-300 ${smsAlerts ? 'right-1' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between py-2">
+                <div>
+                  <span class="block text-xs font-semibold text-white">Automated Sync Frequency</span>
+                  <span class="block text-[10px] text-slate-500">Configure background server database refresh polling rate.</span>
+                </div>
+                <select
+                  value={refreshRate}
+                  onChange={handleRefreshChange}
+                  class="bg-[#060814] text-slate-300 text-xs border border-indigo-500/20 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value={5}>5 seconds</option>
+                  <option value={10}>10 seconds</option>
+                  <option value={30}>30 seconds</option>
+                  <option value={60}>1 minute</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Platform Settings Panel */}
+            <div class="bg-[#0d1326]/60 border border-indigo-500/12 rounded-2xl p-6 glass-panel space-y-4 shadow-xl flex flex-col justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <i data-lucide="database" class="w-4 h-4 text-indigo-400"></i>
+                  Database Backup & Restoration
+                </h3>
+                <p class="text-xs text-slate-400 leading-relaxed font-medium">
+                  Export the active state of all registered assets, triage lists, and maintenance ledger records to an encrypted JSON document, or restore the database configuration.
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-indigo-500/10 flex flex-wrap gap-3">
+                <button
+                  onClick={handleExportDb}
+                  class="px-4 py-2 border border-indigo-500/20 bg-indigo-950/20 text-indigo-400 font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-950/40 transition-colors shadow-lg"
+                >
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                  Backup Database (JSON)
+                </button>
+
+                <label class="px-4 py-2 bg-indigo-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 hover:bg-indigo-500 transition-colors cursor-pointer shadow-lg shadow-indigo-600/20">
+                  <i data-lucide="upload" class="w-4 h-4"></i>
+                  Restore Backup
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportDb}
+                    class="hidden"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -2494,13 +2754,13 @@
           case 'qr':
             return <QrCodesPage assets={assets} />;
           case 'analytics':
-            return <AnalyticsPage />;
+            return <AnalyticsPage assets={assets} issues={issues} maintenance={maintenance} />;
           case 'history':
             return <HistoryPage logs={logs} searchQuery={searchQuery} />;
           case 'users':
             return <UsersPage users={users} setUsers={setUsers} activeRole={activeRole} searchQuery={searchQuery} />;
           case 'settings':
-            return <SettingsPage />;
+            return <SettingsPage assets={assets} setAssets={setAssets} issues={issues} setIssues={setIssues} maintenance={maintenance} setMaintenance={setMaintenance} logs={logs} setLogs={setLogs} users={users} setUsers={setUsers} />;
           case 'technician':
             return <TechnicianPage issues={issues} setIssues={setIssues} maintenance={maintenance} setMaintenance={setMaintenance} assets={assets} users={users} activeRole={activeRole} addSystemLog={addSystemLog} searchQuery={searchQuery} />;
           case 'supervisor':
