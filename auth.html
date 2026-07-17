@@ -495,7 +495,13 @@
       localStorage.setItem('maintainiq_auth', JSON.stringify({ token, user }));
       localStorage.setItem('maintainiq_active_role', user.role);
       showAlert(`Welcome, ${user.full_name || user.username}! Redirecting...`, 'success');
-      setTimeout(() => { window.location.replace('./admin/index.html'); }, 900);
+      setTimeout(() => {
+        if (user.role === 'Technician') {
+          window.location.replace('./technician/index.html');
+        } else {
+          window.location.replace('./admin/index.html');
+        }
+      }, 900);
     }
 
     // ── Local fallback auth (when backend/MongoDB is offline) ─────────────────
